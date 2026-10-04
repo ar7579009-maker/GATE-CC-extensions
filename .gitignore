@@ -1,7 +1,5 @@
-node_modules/
-bundle.js
-www/
-android/
+﻿node_modules/
 dist/
-package-lock.json
-dist-html/
+release/
+out/
+.env

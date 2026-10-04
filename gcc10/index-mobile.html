@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://*.supabase.co" />
+<meta name="theme-color" content="#0F0F0E" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<link rel="manifest" href="web/manifest-mobile.webmanifest" />
+<link rel="apple-touch-icon" href="web/apple-touch-icon.png" />
+<title>GATE CC</title>
+<style>
+/* ── tokens ── */
+:root{
+  --bg:#0F0F0E;--panel:#1C1D1B;--panel2:#242522;--line:#3A3936;
+  --ink:#EDEAE2;--mute:#8A8880;--dim:#5A5850;
+  --amber:#D68A2B;--green:#4A7C6C;--red:#A8452F;--blue:#7B8CDE;
+  --display:Bahnschrift,"DIN Alternate","Arial Narrow",sans-serif;
+  --nav-h:62px;
+}
+[data-theme=light]{
+  --bg:#F4F1EA;--panel:#FFF;--panel2:#ECE8DE;--line:#D6D0C2;
+  --ink:#1C1D1B;--mute:#6B685F;--dim:#9A968A;
+  --amber:#B86F14;--green:#3F7A66;--red:#B03A25;--blue:#5468C8;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body,#root{height:100%;margin:0}
+body{
+  background:var(--bg);color:var(--ink);
+  font:15px/1.5 -apple-system,"Segoe UI",system-ui,sans-serif;
+  overflow:hidden;
+}
+::-webkit-scrollbar{display:none}
+
+/* ── shell ── */
+.shell{
+  display:flex;flex-direction:column;
+  height:100%;
+  padding-top:env(safe-area-inset-top,0px);
+}
+
+/* top header bar */
+.topbar{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 16px 8px;
+  background:var(--panel);
+  border-bottom:1px solid var(--line);
+  flex-shrink:0;
+}
+.topbar-title{font:700 14px var(--display);letter-spacing:.06em;color:var(--amber);flex:1}
+.topbar-right{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--mute)}
+
+/* scrollable content */
+.content{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 14px 8px;-webkit-overflow-scrolling:touch}
+
+/* bottom nav */
+.botnav{
+  display:flex;
+  background:var(--panel);
+  border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  flex-shrink:0;
+}
+.botnav button{
+  flex:1;background:none;border:0;color:var(--mute);
+  padding:10px 4px 8px;
+  font:600 10px var(--display);letter-spacing:.04em;
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;
+}
+.botnav button .ico{font-size:20px;line-height:1}
+.botnav button.on{color:var(--amber)}
+.botnav button.on .ico-bar{
+  width:20px;height:2px;background:var(--amber);border-radius:1px;
+  display:block;margin:0 auto -5px;
+}
+
+/* ── cards ── */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+
+/* ── Today: hero stat row ── */
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.hero-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-align:center}
+.hero-num{font:700 28px/1 var(--display);font-variant-numeric:tabular-nums}
+.hero-label{font-size:11px;color:var(--mute);margin-top:3px}
+
+/* ── Timer: big touch target ── */
+.timer-block{text-align:center;padding:8px 0 14px}
+.timer-big{font:700 56px/1 var(--display);font-variant-numeric:tabular-nums;color:var(--amber);letter-spacing:.02em}
+.timer-sub{font-size:12px;color:var(--mute);margin-top:4px}
+.timer-btns{display:flex;gap:10px;justify-content:center;margin-top:16px}
+.tbtn{
+  min-width:72px;padding:14px 0;border-radius:12px;
+  border:0;font:700 14px var(--display);cursor:pointer;
+  background:var(--amber);color:#1C1D1B;
+}
+.tbtn.ghost{background:var(--panel2);color:var(--ink)}
+.tbtn.stop{background:var(--red);color:var(--ink)}
+
+/* subject chips for timer */
+.sub-chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:14px}
+.sub-chip{
+  background:var(--panel2);border:1px solid var(--line);border-radius:20px;
+  padding:6px 12px;font:600 12px var(--display);color:var(--mute);cursor:pointer;
+}
+.sub-chip.on{background:color-mix(in srgb,var(--amber) 18%,transparent);border-color:var(--amber);color:var(--amber)}
+
+/* daily rings row */
+.rings{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;scrollbar-width:none}
+.ring-item{flex-shrink:0;text-align:center;width:64px}
+.ring-item svg{width:56px;height:56px;transform:rotate(-90deg)}
+.ring-label{font-size:10px;color:var(--mute);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ring-val{font:600 11px var(--display);color:var(--ink);text-align:center;margin-top:1px}
+
+/* plan task list */
+.task{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 0;border-top:1px solid var(--line);
+  cursor:pointer;
+}
+.task:first-child{border-top:0}
+.task-dot{width:8px;height:8px;border-radius:50%;background:var(--c,var(--amber));flex-shrink:0}
+.task-name{flex:1;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.task-right{font-size:12px;color:var(--mute);white-space:nowrap}
+.task-pill{font:600 10px var(--display);padding:2px 7px;border-radius:8px;background:var(--panel2);color:var(--c,var(--mute))}
+
+/* readiness big number */
+.ready-hero{text-align:center;padding:10px 0 16px}
+.ready-pct{font:700 64px/1 var(--display);font-variant-numeric:tabular-nums;color:var(--amber)}
+.ready-sub{font-size:12px;color:var(--mute);margin-top:4px}
+
+/* subject progress rows */
+.sub-row{padding:10px 0;border-top:1px solid var(--line)}
+.sub-row:first-child{border-top:0}
+.sub-name{font-weight:600;margin-bottom:5px;display:flex;justify-content:space-between;font-size:14px}
+.bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--amber);border-radius:3px}
+.bar.g>i{background:var(--green)}
+
+/* ticks in syllabus */
+.lec-touch{
+  display:flex;gap:12px;align-items:center;
+  padding:11px 0;border-top:1px solid var(--line);
+  cursor:pointer;
+}
+.lec-touch:first-child{border-top:0}
+.lec-check{
+  width:24px;height:24px;border-radius:6px;border:2px solid var(--line);
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font-size:14px;transition:all .1s;
+}
+.lec-check.done{background:var(--amber);border-color:var(--amber);color:#1C1D1B}
+.lec-name{flex:1;font-size:14px;color:var(--mute)}
+.lec-name.done{color:var(--ink)}
+
+/* test rows */
+.test-row{padding:11px 0;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+.test-row:first-child{border-top:0}
+.test-name{flex:1;font-weight:600;font-size:14px;min-width:0}
+.test-meta{font-size:12px;color:var(--mute)}
+.test-score{font:700 16px var(--display);color:var(--amber)}
+
+/* settings rows */
+.set-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.set-row:first-child{border-top:0}
+.set-label{font-size:14px;font-weight:600}
+.set-sub{font-size:12px;color:var(--mute);margin-top:2px}
+
+/* floating timer pill (timer running, on other tabs) */
+.float-timer{
+  position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 10px);
+  right:14px;z-index:20;
+  background:var(--amber);color:#1C1D1B;
+  border-radius:20px;padding:7px 14px;
+  font:700 14px var(--display);font-variant-numeric:tabular-nums;
+  cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,.4);
+  display:none;
+}
+
+/* PYQ counter big touch */
+.pyq-row{display:flex;align-items:center;gap:16px;justify-content:center;margin:12px 0}
+.pyq-btn{
+  width:48px;height:48px;border-radius:50%;border:0;
+  background:var(--panel2);color:var(--ink);
+  font:700 24px var(--display);cursor:pointer;
+}
+.pyq-num{font:700 36px/1 var(--display);font-variant-numeric:tabular-nums;min-width:48px;text-align:center}
+
+/* week bar mini */
+.week-bars{display:flex;gap:4px;align-items:flex-end;height:44px}
+.week-bar{flex:1;border-radius:3px 3px 0 0;min-height:3px}
+.week-day{font-size:9px;color:var(--mute);text-align:center;margin-top:3px}
+
+/* typography */
+h2{margin:0 0 12px;font:700 17px var(--display);letter-spacing:.03em}
+h3{margin:0 0 6px;font:600 14px var(--display)}
+.mute{color:var(--mute)}.small{font-size:12px}
+.tag{font:600 10px var(--display);padding:1px 6px;border-radius:3px;background:var(--panel2);color:var(--mute)}
+.tag.live{color:var(--amber)}.tag.ok{color:var(--green)}.tag.bad{color:var(--red)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <span class="topbar-title">GATE CC</span>
+    <div class="topbar-right" id="topbar-right"></div>
+  </div>
+  <div class="content" id="content">
+    <div id="root"></div>
+  </div>
+  <nav class="botnav" id="botnav">
+    <button class="on" data-tab="today">
+      <span class="ico-bar"></span>
+      <span class="ico">⚡</span>
+      <span>Today</span>
+    </button>
+    <button data-tab="syllabus">
+      <span class="ico-bar" style="display:none"></span>
+      <span class="ico">📚</span>
+      <span>Syllabus</span>
+    </button>
+    <button data-tab="ready">
+      <span class="ico-bar" style="display:none"></span>
+      <span class="ico">📊</span>
+      <span>Readiness</span>
+    </button>
+    <button data-tab="tests">
+      <span class="ico-bar" style="display:none"></span>
+      <span class="ico">📝</span>
+      <span>Tests</span>
+    </button>
+    <button data-tab="settings">
+      <span class="ico-bar" style="display:none"></span>
+      <span class="ico">⚙</span>
+      <span>More</span>
+    </button>
+  </nav>
+  <div class="float-timer" id="float-timer"></div>
+</div>
+<script>
+  document.body.dataset.platform = 'mobile';
+  // Wire bottom nav clicks → React
+  document.getElementById('botnav').addEventListener('click', e => {
+    const btn = e.target.closest('[data-tab]');
+    if (!btn) return;
+    document.querySelectorAll('.botnav [data-tab]').forEach(b => {
+      const on = b === btn;
+      b.classList.toggle('on', on);
+      b.querySelector('.ico-bar').style.display = on ? 'block' : 'none';
+    });
+    window.__gccSetTab?.(btn.dataset.tab);
+  });
+</script>
+<script src="bundle.js"></script>
+</body>
+</html>
