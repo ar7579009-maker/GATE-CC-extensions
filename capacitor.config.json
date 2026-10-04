@@ -1,0 +1,6 @@
+{
+  "appId": "com.abhinav.gatecommandcenter",
+  "appName": "GATE Command Center",
+  "webDir": "www",
+  "android": { "backgroundColor": "#0F0F0E" }
+}
