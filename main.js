@@ -38,7 +38,7 @@ function createWindow() {
   win.setMenuBarVisibility(false);
   win.on('resize', saveBounds); win.on('move', saveBounds);
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
-  win.loadFile(path.join(__dirname, 'index.html'));
+  win.loadFile(path.join(__dirname, 'index-win.html'));
   win.on('close', (e) => { if (!quitting && closeToTray) { e.preventDefault(); win.hide(); } });
 
   // Ctrl/Cmd+M: widget <-> desktop size. Ctrl/Cmd+T: always on top.
@@ -76,6 +76,22 @@ ipcMain.on('prefs', (_, p) => {
   if (th && win) { win.setBackgroundColor(th[0]); if (win.setTitleBarOverlay) try { win.setTitleBarOverlay({ color: th[0], symbolColor: th[1], height: 36 }); } catch {} }
 });
 
-app.whenReady().then(() => { createWindow(); app.on('activate', showWin); });
+/* ───────── PW sync file watch ───────── */
+const pwFile = () => path.join(app.getPath('downloads'), 'GCC', 'pw-sync-latest.json');
+function readPw() {
+  try { const t = fs.readFileSync(pwFile(), 'utf8'); const o = JSON.parse(t); return o && o.kind === 'pw-sync' ? t : null; } catch { return null; }   // unparsable / half-written / wrong kind -> ignored
+}
+let pwT;
+function pushPw() { const t = readPw(); if (t && win && !win.isDestroyed()) win.webContents.send('pw:snapshot', t); }
+function watchPw() {
+  fs.watchFile(pwFile(), { interval: 2000, persistent: false }, (cur, prev) => {
+    if (cur.mtimeMs === prev.mtimeMs && cur.size === prev.size) return;
+    clearTimeout(pwT); pwT = setTimeout(pushPw, 1500);
+  });
+  if (win) win.webContents.once('did-finish-load', pushPw);
+}
+ipcMain.handle('pw:latest', () => readPw());
+
+app.whenReady().then(() => { createWindow(); watchPw(); app.on('activate', showWin); });
 app.on('before-quit', () => { quitting = true; });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

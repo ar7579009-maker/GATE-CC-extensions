@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "GATE Command Center - PW Sync",
+  "version": "0.3.0",
+  "description": "Reads your Parakram lectures, watch progress and test results from pw.live and saves them to Downloads\\GCC\\pw-sync-latest.json for the GATE Command Center app. Syncs when you open PW and at the end of the day. Runs only in your browser.",
+  "permissions": ["storage", "alarms", "downloads"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    { "matches": ["https://www.pw.live/*"], "js": ["core.js", "main.js"], "run_at": "document_start", "world": "MAIN" },
+    { "matches": ["https://www.pw.live/study-v2/*"], "js": ["bridge.js"], "run_at": "document_idle" }
+  ]
+}

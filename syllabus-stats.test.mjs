@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { chapterStats, subjectStats, fmtLeft } from './syllabus-stats.js';
+const c = { lectures: [{ done: true, dpp: 'D1', date: '5 Oct', dur: 3600 }, { pw: 'partial', dur: 1800 }, { dur: 5400, date: '—' }, { name: 'x' }] };
+const s = chapterStats(c);
+assert.deepEqual(s, { total: 4, done: 1, partial: 1, dpps: 1, live: 1, leftSec: 7200, unknown: 1 });
+assert.equal(fmtLeft(s), '2.0 h left');
+assert.equal(fmtLeft(chapterStats({ lectures: [] })), '');
+const t = subjectStats({ chapters: [c, c] });
+assert.equal(t.total, 8); assert.equal(t.leftSec, 14400); assert.equal(t.partial, 2);
+assert.deepEqual(chapterStats(undefined), { total: 0, done: 0, partial: 0, dpps: 0, live: 0, leftSec: 0, unknown: 0 });
+console.log('all syllabus-stats tests passed');

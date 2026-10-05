@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Num } from './ui.js';
-import { PLAN_DEF, planCfg } from './planner.js';
+import { Num, Inline } from './ui.js';
+import { PLAN_DEF, planCfg, calcPace } from './planner.js';
 
 const TONE = { red: 'var(--red)', amber: 'var(--amber)' };
 const STATUS = {
@@ -12,7 +12,7 @@ const Bar = ({ v, c = '' }) => <div className={`bar ${c}`}><i style={{ width: `$
 const fh = (x) => (Math.round(x * 10) / 10).toString();
 const sdy = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
-function Item({ it, first, onRev }) {
+function Item({ it, first, onRev, pyq }) {
   const col = it.done ? 'var(--green)' : TONE[it.tone] || 'var(--mute)';
   return (
     <div className="row" style={{ flexWrap: 'nowrap', alignItems: 'flex-start', gap: 8, padding: '7px 0', borderTop: first ? 0 : '1px solid var(--line)' }}>
@@ -21,20 +21,16 @@ function Item({ it, first, onRev }) {
         <div className={it.done ? 'mute' : ''} style={it.done ? { textDecoration: 'line-through' } : TONE[it.tone] ? { color: TONE[it.tone] } : undefined}>{it.label}</div>
         {it.detail && <div className="mute small">{it.detail}</div>}
       </div>
-      {it.rk && onRev ? <button className="btn sm ghost" onClick={() => onRev(it.rk, it.ri)}>Done</button>
+      {it.kind === 'pyq' && pyq ? <span className="row" style={{ flexWrap: 'nowrap', gap: 6, flexShrink: 0 }}><button className="btn sm ghost" aria-label="One less" onClick={pyq.dec}>−</button><b style={{ minWidth: 22, textAlign: 'center' }}>{pyq.count}</b><button className="btn sm ghost" aria-label="One more" onClick={pyq.inc}>+</button></span>
+        : it.rk && onRev ? <button className="btn sm ghost" onClick={() => onRev(it.rk, it.ri)}>Done</button>
         : it.est > 0 && !it.done && <span className="mute small" style={{ flexShrink: 0 }}>{fh(it.est)} h</span>}
     </div>
   );
 }
 
-function Verdict({ P, s, set }) {
+export function Verdict({ P, s, set }) {
   const H = P.horizon, [col, label] = STATUS[H.status];
-  const skipped = s.subjects.filter((x) => (s.plan?.skip || {})[x.id]);
-  const act = (o) => {
-    if (o.kind === 'skip') set('plan', (p) => ({ ...PLAN_DEF, ...(p || {}), skip: { ...((p && p.skip) || {}), [o.subId]: true } }));
-    else if (o.kind === 'move') set('targetDate', o.date);
-  };
-  const done = H.remainingLectures === 0;
+  const done = H.remainingLectures === 0, more = H.options.find((o) => o.kind === 'raise');
   return (
     <div className="card" style={{ borderColor: col }}>
       <div className="row sb" style={{ flexWrap: 'nowrap', alignItems: 'baseline' }}>
@@ -43,35 +39,46 @@ function Verdict({ P, s, set }) {
       </div>
       {done
         ? <div style={{ marginTop: 8 }}>Every lecture before the target date is ticked. Spend the time on PYQs and tests.</div>
-        : H.needPerDay == null
-          ? <div style={{ marginTop: 8 }}>The target date has passed with {H.remainingLectures} lectures left. Move the date or skip subjects below.</div>
-          : <>
-            <div className="row" style={{ gap: 20, marginTop: 8 }}>
-              <div><div className="num" style={{ color: col }}>{fh(H.needPerDay)}<span className="mute small"> h/day</span></div><div className="mute small">needed</div></div>
-              <div><div className="num">{fh(H.actual7)}<span className="mute small"> h/day</span></div><div className="mute small">last 7 days</div></div>
-              <div><div className="num">{fh(H.goalH)}<span className="mute small"> h/day</span></div><div className="mute small">your goal</div></div>
-            </div>
-            <div className="mute small" style={{ marginTop: 8 }}>
-              {H.remainingLectures} lectures left, about {fh(H.remainingHours)} h with DPP, PYQs and revision, over {H.workDays} study days.
-              {H.missedLive > 0 && <> {H.missedLive} live lectures were missed.</>}
-            </div>
-          </>}
-      {H.status !== 'green' && H.options.length > 0 && (
-        <div style={{ marginTop: 10 }}>
-          <div className="small" style={{ fontWeight: 600, marginBottom: 2 }}>To close the gap, pick one:</div>
-          {H.options.map((o) => (
-            <div key={o.id} className="row sb small" style={{ flexWrap: 'nowrap', padding: '5px 0', borderTop: '1px solid var(--line)' }}>
-              <span style={{ minWidth: 0 }}>{o.label}{o.kind === 'skip' && <span className="mute"> · saves {fh(o.saves)} h, puts about {fh(o.marksPct)}% of exam marks at risk</span>}</span>
-              {o.kind !== 'raise' && <button className="btn sm ghost" onClick={() => act(o)}>{o.kind === 'skip' ? 'Skip' : 'Move'}</button>}
-            </div>
-          ))}
-        </div>
-      )}
-      {skipped.length > 0 && (
-        <div className="small mute" style={{ marginTop: 10 }}>
-          Skipped: {skipped.map((x, i) => <span key={x.id}>{i ? ', ' : ''}{x.name} <button className="ink" onClick={() => set('plan', (p) => { const k = { ...(p?.skip || {}) }; delete k[x.id]; return { ...PLAN_DEF, ...(p || {}), skip: k }; })}>restore</button></span>)}
-        </div>
-      )}
+        : <>
+          <div className="row" style={{ gap: 20, marginTop: 8 }}>
+            <div><div className="num" style={{ color: col }}>{H.needPerDay == null ? '–' : fh(H.needPerDay)}<span className="mute small"> h/day</span></div><div className="mute small">needed</div></div>
+            <div><div className="num">{fh(H.actual7)}<span className="mute small"> h/day</span></div><div className="mute small">last 7 days</div></div>
+            <div><div className="num"><Inline min={1} max={16} value={H.goalH} onValue={(v) => set('goalH', v)} /><span className="mute small"> h/day</span></div><div className="mute small">your goal · tap to edit</div></div>
+          </div>
+          <div className="mute small" style={{ marginTop: 8 }}>
+            {H.remainingLectures} lectures left, about {fh(H.remainingHours)} h with DPP, PYQs and revision, over {H.workDays} study days.
+            {H.missedLive > 0 && <> {H.missedLive} live lectures were missed.</>}
+          </div>
+          {H.needPerDay == null && <div style={{ marginTop: 8 }}>The target date has passed with {H.remainingLectures} lectures left. The calculator below shows how long they take at your pace.</div>}
+          {H.status !== 'green' && more && <div className="small" style={{ marginTop: 8, fontWeight: 600 }}>To close the gap: {more.label}.</div>}
+        </>}
+    </div>
+  );
+}
+
+/* ── pace calculator: playback speed x hours per day x window -> finish date, days early/late, hours covered ── */
+export function PaceCalc({ P, s, set, today }) {
+  const H = P.horizon, [hrs, setHrs] = useState(null), [win, setWin] = useState(null);
+  const speed = s.calcSpeed || 1, hPerDay = hrs ?? H.goalH, windowDays = win ?? Math.max(1, H.daysLeft);
+  const r = calcPace({ total: H.remainingHours, video: H.videoHours, speed, hPerDay, windowDays, today, targetDate: H.targetDate, restDay: H.restDay, bufferPct: H.bufferPct });
+  const early = r.daysEarly, lab = early == null ? 'never at this pace' : sdy(r.finish);
+  const Cell = ({ k, v, sub, c }) => <div style={{ minWidth: 0 }}><div className="num" style={{ fontSize: 20, color: c }}>{v}</div><div className="mute small">{k}</div>{sub && <div className="dim small">{sub}</div>}</div>;
+  return (
+    <div className="card">
+      <h3>Planner calculator</h3>
+      <div className="row small mute" style={{ gap: 12, marginBottom: 10 }}>
+        <label>Speed <select value={speed} onChange={(e) => set('calcSpeed', +e.target.value)}>{[1, 1.25, 1.5, 1.75, 2].map((x) => <option key={x} value={x}>{x}x</option>)}</select></label>
+        <label>Hours/day <Num min={0.5} max={16} value={hPerDay} onValue={setHrs} style={{ width: 60 }} /></label>
+        <label>Window <Num min={1} max={400} value={windowDays} onValue={setWin} style={{ width: 62 }} /> days</label>
+      </div>
+      <div className="grid" style={{ gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))' }}>
+        <Cell k="hours left" v={`${fh(r.hours)} h`} sub={speed > 1 && H.videoHours > 0 ? `${fh(H.remainingHours - r.hours)} h saved by ${speed}x` : undefined} />
+        <Cell k="finish date" v={lab} />
+        <Cell k={early == null ? 'versus target' : early >= 0 ? 'days early' : 'days late'} v={early == null ? '–' : Math.abs(early)} c={early == null || early < 0 ? 'var(--red)' : 'var(--green)'} />
+        <Cell k={`covered in ${windowDays} days`} v={`${fh(r.windowHours)} h`} sub="after the lost-days buffer" />
+        <Cell k="needed to hit target" v={r.neededPerDay == null ? '–' : `${fh(r.neededPerDay)} h/day`} sub={`by ${sdy(H.targetDate)}`} />
+      </div>
+      <div className="dim small" style={{ marginTop: 8 }}>Speed only shortens lecture video with a known length; DPP, PYQs, notes and revision time stay as estimated.</div>
     </div>
   );
 }
@@ -89,11 +96,9 @@ function Span({ title, data, hours, extra }) {
   );
 }
 
-export function PlanView({ P, s, set }) {
-  const [tab, setTab] = useState('week');
+export function TodayList({ P, s, set, pyq }) {
   const revDone = (key, i) => set('revq', (a) => a.map((r) => (r.key === key ? { ...r, done: r.done.map((d, j) => (j === i ? true : d)) } : r)));
-  const T = P.today, E = P.exam, left = T.items.filter((i) => !i.done).length;
-  const tabs = [['week', 'This week'], ['month', 'This month'], ['exam', 'Until exam']];
+  const T = P.today, left = T.items.filter((i) => !i.done).length;
   return (<>
     {P.doNow && (
       <div className="card" style={{ borderColor: 'var(--amber)' }}>
@@ -104,16 +109,23 @@ export function PlanView({ P, s, set }) {
     )}
     <div className="card">
       <div className="row sb"><h3 style={{ margin: 0 }}>Today</h3><span className="mute small">{left} left · about {fh(T.hours)} of {fh(T.capH)} h</span></div>
-      {T.items.map((it, i) => <Item key={it.key} it={it} first={i === 0} onRev={revDone} />)}
+      {T.items.map((it, i) => <Item key={it.key} it={it} first={i === 0} onRev={revDone} pyq={pyq} />)}
       {T.over.length > 0 && (
         <details style={{ marginTop: 6 }}>
           <summary className="small mute" style={{ cursor: 'pointer' }}>{T.over.length} more over today's {fh(T.capH)} h cap</summary>
-          {T.over.map((it, i) => <Item key={it.key} it={it} first={i === 0} onRev={revDone} />)}
+          {T.over.map((it, i) => <Item key={it.key} it={it} first={i === 0} onRev={revDone} pyq={pyq} />)}
         </details>
       )}
       <div className="dim small" style={{ marginTop: 6 }}>Items tick themselves from your timer, lecture ticks and logged tests.</div>
     </div>
-    <Verdict P={P} s={s} set={set} />
+  </>);
+}
+
+export function PlanOutlook({ P }) {
+  const [tab, setTab] = useState('week');
+  const E = P.exam;
+  const tabs = [['week', 'This week'], ['month', 'This month'], ['exam', 'Until exam']];
+  return (<>
     <div className="row" style={{ gap: 6, margin: '4px 0 8px' }}>
       {tabs.map(([k, l]) => <button key={k} className={`chip ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{l}</button>)}
     </div>

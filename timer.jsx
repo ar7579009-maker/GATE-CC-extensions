@@ -132,8 +132,8 @@ export function TimerCard({ s, set, eng, rows, todaySec }) {
   const col = t ? (run ? (done ? 'var(--green)' : 'var(--amber)') : 'var(--mute)') : 'var(--ink)';
   const TAGS = [['L', 'Learn'], ['P', 'Practice'], ['R', 'Revise']], curTag = t ? (t.tag || 'L') : (s.ttag || 'L');
   return (<div className="card">
-    <div className="row" style={{ marginBottom: 8 }}>{TAGS.map(([k, l]) => <button key={k} disabled={!!t} className={`btn sm ${curTag === k ? '' : 'ghost'}`} onClick={() => set('ttag', k)}>{l}</button>)}</div>
-    <h2>Deep-work timer</h2>
+    <h2 style={{ textAlign: 'center', marginBottom: 8 }}>Deep-work timer</h2>
+    <div className="row" style={{ marginBottom: 10, justifyContent: 'center' }}>{TAGS.map(([k, l]) => <button key={k} disabled={!!t} className={`btn sm ${curTag === k ? '' : 'ghost'}`} onClick={() => set('ttag', k)}>{l}</button>)}</div>
     {rec && t && <div className="toast" role="alert"><span>Timer was running while the app was closed (last seen {fmtT(rec.last)}). Still studying?</span><span className="row"><button className="btn sm" onClick={api.recKeep}>Keep all</button><button className="btn sm ghost" onClick={api.recStopAt}>Stop at {fmtT(rec.last)}</button></span></div>}
     <div style={{ textAlign: 'center', margin: '2px 0 12px' }}>
       <div className="timer big" style={{ color: col, fontSize: 'clamp(46px,16vw,64px)' }}>{t && left !== null && left <= 0 ? '+' : ''}{clock(shown)}</div>
@@ -141,7 +141,7 @@ export function TimerCard({ s, set, eng, rows, todaySec }) {
       <div className="bar" style={{ marginTop: 8 }}><i style={{ width: `${Math.max(0, Math.min(100, (t ? sessF : todaySec / goal) * 100))}%`, background: done ? 'var(--green)' : undefined }} /></div>
     </div>
     <div className="row" style={{ justifyContent: 'center', marginBottom: 10 }}>
-      {[['free', 'Stopwatch'], [25, '25 min'], [50, '50 min'], [90, '90 min'], ['custom', 'Custom']].map(([m, l]) => <button key={m} className={`chip ${s.tmode === m ? 'on' : ''}`} disabled={!!t} onClick={() => set('tmode', m)}>{l}</button>)}
+      {[['free', 'Stopwatch'], ['custom', 'Countdown']].map(([m, l]) => <button key={m} className={`chip ${(m === 'free') === (s.tmode === 'free') ? 'on' : ''}`} disabled={!!t} onClick={() => set('tmode', m)}>{l}</button>)}
       {!t && s.tmode === 'custom' && <><Num min={1} max={300} value={s.tcustom} onValue={(v) => set('tcustom', v)} style={{ width: 60 }} /><span className="small mute">min</span></>}
       {!t && s.tmode !== 'free' && <><span className="small mute">· break</span><Num min={1} max={60} value={s.breakMin} onValue={(v) => set('breakMin', v)} style={{ width: 54 }} /></>}
     </div>

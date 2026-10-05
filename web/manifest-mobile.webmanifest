@@ -1,0 +1,15 @@
+{
+  "name": "GATE CC",
+  "short_name": "GATE CC",
+  "description": "GATE CSE 2027 — mobile study tracker",
+  "start_url": "../index-mobile.html",
+  "scope": "../",
+  "display": "standalone",
+  "background_color": "#0F0F0E",
+  "theme_color": "#0F0F0E",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { buildPlan, lectureDate, workDays, addDays, diffDays, planCfg, PLAN_DEF } from './planner.js';
+import { buildPlan, lectureDate, workDays, addDays, diffDays, planCfg, PLAN_DEF, calcPace, mastery, shrink, weightsFor, masteryLabel } from './planner.js';
 
 // dates
 assert.strictEqual(lectureDate('5 Oct', '2026-10-04'), '2026-10-05');
@@ -35,23 +35,18 @@ assert.strictEqual(P.horizon.needPerDay, 1.8); assert.strictEqual(P.horizon.stat
 // same, but 7 days of 3 h logged -> green
 const log = {}; for (let i = 1; i <= 7; i++) log[addDays('2026-10-04', -i)] = { cn: 3 * 3600 };
 P = buildPlan({ ...base, subjects, log }); assert.strictEqual(P.horizon.status, 'green'); assert.strictEqual(P.horizon.actual7, 3);
-// red: far more work than goalH allows -> options include a skip, and a later date
+// red: far more work than goalH allows -> the only option is to study more; nothing proposes cutting scope or moving the date
 subjects = [sub('cn', 'cn', 'rec', [{ name: 'Ch1', lectures: lec(60) }]), sub('os', 'os', 'rec', [{ name: 'Ch1', lectures: lec(10) }])];
 P = buildPlan({ ...base, subjects });
 assert.strictEqual(P.horizon.status, 'red');
-const kinds = P.horizon.options.map((o) => o.kind); assert.ok(kinds.includes('skip') && kinds.includes('move') && kinds.includes('raise'));
-const mv = P.horizon.options.find((o) => o.kind === 'move'); assert.ok(mv.date > base.targetDate);
-// skipping removes the subject's hours
+assert.deepStrictEqual(P.horizon.options.map((o) => o.kind), ['raise']);
+// a stale plan.skip from v10 no longer removes any hours
 const before = P.horizon.remainingHours;
 P = buildPlan({ ...base, subjects, plan: { ...base.plan, skip: { cn: true } } });
-assert.strictEqual(P.horizon.remainingHours, before - 120);
-// skip options carry the subject's share of its marks group (two courses in one group split its marks by lectures left)
-subjects = [sub('prog1', 'prog', 'rec', [{ name: 'A', lectures: lec(50) }]), sub('prog2', 'prog', 'rec', [{ name: 'B', lectures: lec(40) }])];
-P = buildPlan({ ...base, subjects });
-const o1 = P.horizon.options.find((o) => o.id === 'skip:prog1'), o2 = P.horizon.options.find((o) => o.id === 'skip:prog2');
-assert.ok(Math.abs(o1.marksPct + o2.marksPct - (10 / 50) * 100) < 1e-9);     // together they carry the whole 10 of 50 marks
-assert.ok(o1.marksPct > o2.marksPct);
-assert.strictEqual(o1.overlap, undefined);
+assert.strictEqual(P.horizon.remainingHours, before);
+// real lecture durations (PW sync) are reported as video hours; ticked lectures and lectures without a length are not counted
+subjects = [sub('os', 'os', 'rec', [{ name: 'Ch1', lectures: [{ name: 'a', date: '-', dur: 3600 }, { name: 'b', date: '-', dur: 7200, done: true }, { name: 'c', date: '-' }] }])];
+P = buildPlan({ ...base, subjects }); assert.strictEqual(P.horizon.videoHours, 1);
 // placeholder chapter counts as `plc` lectures; ticking it removes that work
 subjects = [sub('ds', 'cn', 'live', [{ name: 'Trees', lectures: [{ name: 'Lectures done', date: '-', done: false }] }])];
 P = buildPlan({ ...base, subjects, plan: { ...base.plan, plc: 4 } }); assert.strictEqual(P.horizon.remainingLectures, 4);
@@ -104,4 +99,31 @@ assert.strictEqual(P.exam.testsTotal, 2); assert.strictEqual(P.exam.testsDone, 1
 // a marks row with no lectures (e.g. Digital Logic) is ignored, not flagged as behind
 P = buildPlan({ ...base, rows: [...rows, { id: 'digital', name: 'Digital', marks: 5, group: 'core' }], subjects });
 assert.ok(!P.week.items.some((i) => i.key === 'wb:digital' || i.key === 'wn:digital'));
+// mastery (moved here from readiness-core.js; same assertions)
+{
+  const near = (a, b, e = 0.06) => assert.ok(Math.abs(a - b) < e, `${a} vs ${b}`);
+  const w = { cov: 40, pyq: 30, rev: 30 };
+  near(shrink(1, 100), 66.67); near(shrink(4, 100), 83.33); assert.strictEqual(shrink(0, 0), null); near(shrink(1, 100, 40), 60);
+  const a = weightsFor(w, false); near(a.cov, 40 / 70, 1e-9); near(a.pyq, 30 / 70, 1e-9); assert.strictEqual(a.test, 0);
+  const b = weightsFor(w, true); near(b.cov + b.pyq + b.test, 1, 1e-9);
+  near(mastery({ C: 100, P: 100, w }).M, 100);
+  assert.ok(mastery({ C: 0, P: 0, tests: [100], w }).M < 25);
+  assert.strictEqual(masteryLabel(85), 'Strong'); assert.strictEqual(masteryLabel(84.9), 'Medium'); assert.strictEqual(masteryLabel(49.9), 'Weak');
+}
+// calcPace: speed only shrinks the video part
+{
+  const c = { total: 100, video: 60, hPerDay: 5, today: '2026-10-05', targetDate: '2026-12-31', restDay: -1, bufferPct: 0, windowDays: 10 };
+  const a = calcPace({ ...c, speed: 1 }), b = calcPace({ ...c, speed: 2 }), r = calcPace({ ...c, speed: 1.5 });
+  assert.strictEqual(a.hours, 100); assert.strictEqual(b.hours, 70); assert.strictEqual(r.hours, 80);
+  assert.strictEqual(a.finish, '2026-10-24'); assert.strictEqual(b.finish, '2026-10-18');           // 20 and 14 study days at 5 h
+  assert.strictEqual(a.daysEarly, diffDays('2026-12-31', '2026-10-24')); assert.ok(b.daysEarly > a.daysEarly);
+  assert.strictEqual(a.windowHours, 50);                                                             // 10 days x 5 h
+  const days = diffDays('2026-12-31', '2026-10-05') + 1; assert.strictEqual(a.neededPerDay, Math.round(100 / days * 10) / 10);
+  // buffer lowers effective hours per day; late finish gives negative daysEarly; 0 h/day has no finish date
+  assert.ok(calcPace({ ...c, speed: 1, bufferPct: 20 }).finish > a.finish);
+  assert.ok(calcPace({ ...c, speed: 1, hPerDay: 0.5 }).daysEarly < 0);
+  assert.strictEqual(calcPace({ ...c, speed: 1, hPerDay: 0 }).finish, null);
+  assert.strictEqual(calcPace({ ...c, total: 0, video: 0 }).finish, '2026-10-05');
+  assert.strictEqual(calcPace({ ...c, video: 500, speed: 2 }).hours, 50);                            // video is capped at total
+}
 console.log('planner ok');

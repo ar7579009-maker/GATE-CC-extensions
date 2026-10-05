@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GATE Command Center · preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#141210;--card:#1e1b18;--line:#322d28;--tx:#efe9df;--mut:#9a9186;--acc:#e0892b;--bad:#d9573f;--ok:#5fa58a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:light){:root:not([data-theme=dark]){--bg:#f4f0ea;--card:#fff;--line:#ddd5ca;--tx:#221e19;--mut:#766d62;--acc:#b5651a}}
+:root[data-theme=dark]{--bg:#141210;--card:#1e1b18;--line:#322d28;--tx:#efe9df;--mut:#9a9186;--acc:#e0892b}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,sans-serif;max-width:560px;margin:0 auto;padding:14px 14px 80px}
+h1,h2,.num{font-family:'Barlow Condensed',Impact,sans-serif;font-weight:700;margin:0}
+h2{font-size:20px}
+nav{display:flex;gap:6px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding:8px 0;z-index:5;overflow-x:auto}
+nav button,.pill{border:1px solid var(--line);background:none;color:var(--mut);border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer;white-space:nowrap}
+nav button.on,.pill.on{background:var(--acc);border-color:var(--acc);color:#1a1209;font-weight:600}
+.card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+.x{display:none;position:absolute;top:8px;right:8px;border:1px solid var(--line);background:var(--bg);color:var(--mut);border-radius:50%;width:26px;height:26px;cursor:pointer}
+.edit .x{display:block}.edit .card:not([data-lock]){outline:1px dashed var(--acc)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.nums{display:flex;gap:22px;margin:6px 0}.nums div{font-size:13px;color:var(--mut)}
+.num{font-size:38px;line-height:1;display:block;color:var(--tx)}.num.bad{color:var(--bad)}.num small{font-size:16px;color:var(--mut)}
+.bar{height:7px;background:var(--line);border-radius:4px;overflow:hidden;margin:6px 0}.bar i{display:block;height:100%;background:var(--acc)}
+.mut{color:var(--mut);font-size:13px}.ok{color:var(--ok)}.bad{color:var(--bad)}
+label.item{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+input,select{background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;width:90px}
+input[readonly]{border-color:transparent;background:none;padding-left:0}
+.edit input[readonly]{border-color:var(--acc)}
+.btn{background:var(--acc);color:#1a1209;border:0;border-radius:8px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
+.tag{font-size:12px;border:1px solid var(--line);border-radius:6px;padding:1px 7px;color:var(--mut);margin-right:4px}
+.view{display:none}.view.on{display:block}
+.note{font-size:12px;color:var(--mut);border-left:2px solid var(--acc);padding-left:8px;margin:4px 0 10px}
+.timer{font-family:'Barlow Condensed',sans-serif;font-size:64px;font-weight:700;text-align:center;line-height:1}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+</style></head><body>
+<div class="note">Prototype with sample data from your sync. Use <b>Settings → Edit layout</b> to hide cards or edit fields, then tell me what stays.</div>
+<nav id="nav"></nav>
+
+<section class="view on" data-v="Today">
+<div class="card" data-id="timer" style="text-align:center"><h2>Deep-work timer</h2>
+<div class="row" style="justify-content:flex-start;margin:8px 0"><span class="pill on">Learn</span><span class="pill">Practice</span><span class="pill">Revise</span></div>
+<div class="timer">00:00:00</div><div class="mut" style="text-align:center">Today 1.2 / <span id="tg">8</span> h</div>
+<div class="bar"><i id="tb" style="width:15%"></i></div>
+<div class="row"><select style="width:auto"><option>C Programming</option><option>Computer Networks</option></select><button class="btn">Start session</button></div></div>
+
+<div class="card" data-lock data-id="verdict"><div class="row"><h2 class="bad">Off track for 31 Dec</h2><span class="mut">87 days left</span></div>
+<div class="nums"><div><span class="num bad">11<small> h/day</small></span>needed</div><div><span class="num">4<small> h/day</small></span>last 7 days</div><div><span class="num"><span id="g">8</span><small> h/day</small></span>your goal</div></div>
+<p class="mut">385 lectures left, about 823 h with DPP, PYQs and revision.</p>
+</div>
+<div class="card" data-id="calc"><h2>Planner</h2><div class="mut">Pick a speed and daily hours to see what you cover.</div>
+<div class="row" style="margin-top:8px"><span>Playback speed</span><select id="sp"><option>1</option><option>1.25</option><option selected>1.5</option><option>1.75</option><option>2</option></select></div>
+<div class="row"><span>Study hours per day</span><input id="hd" type="number" min="1" max="16" step="0.5" value="8"></div>
+<div class="row"><span>Window (days)</span><input id="wd" type="number" min="1" max="120" value="14"></div>
+<div id="co" style="border-top:1px solid var(--line);padding-top:8px;margin-top:8px"></div></div>
+
+<div class="card" data-lock data-id="today"><div class="row"><h2>Today</h2><span class="mut">target <input id="goal" type="number" min="1" max="16" step="0.5" value="8" style="width:64px"> h/day</span></div>
+<div class="mut">Do now</div><div style="font-size:18px;font-weight:600">Computer Networks · Lecture 2 (resume 41:10)</div>
+<label class="item"><input type="checkbox" style="width:auto"><span>C Programming · Pointers 3 <span class="mut">52 min</span></span></label>
+<label class="item"><input type="checkbox" style="width:auto"><span>Theory of Computation · DFA minimization <span class="mut">64 min</span></span></label>
+<label class="item"><input type="checkbox" style="width:auto"><span>Digital Logic · K-maps <span class="mut">48 min</span></span></label>
+<label class="item"><input type="checkbox" style="width:auto"><span>Revision (+7 days): Operating Systems · Deadlocks</span></label>
+<label class="item"><input type="checkbox" style="width:auto"><span>PYQs: 10 questions, C Programming</span></label></div>
+
+<div class="card" data-id="deadline"><div class="row"><div><span class="num">87</span><span class="mut"> days to syllabus completion · 31 Dec 2026</span></div><div class="mut">GATE 6 Feb 2027 · 124 d</div></div></div>
+</section>
+
+<section class="view" data-v="Plan">
+<div class="card" data-id="schedule"><h2>Schedule</h2><div class="mut">4 Oct to 6 Feb · tap a subject to edit its dates</div>
+<div style="margin:10px 0"><b>C Programming</b> <span class="mut">~6% marks · 5 d left</span><div class="bar"><i style="width:30%"></i></div><span class="ok mut">On pace · 65% vs 17%</span> <input class="f" readonly value="4 Oct → 10 Oct" style="width:130px"></div>
+<div style="margin:10px 0"><b>Operating Systems</b> <span class="mut">8-10% · 18 d left</span><div class="bar"><i style="width:36%"></i></div><span class="ok mut">On pace · 36% vs 5%</span> <input class="f" readonly value="4 Oct → 23 Oct" style="width:130px"></div>
+<div style="margin:10px 0"><b>Computer Networks</b> <span class="mut">7-9% · starts 12 Oct</span><div class="bar"><i style="width:1%"></i></div><span class="bad mut">Heavy: 149 h left</span> <input class="f" readonly value="12 Oct → 15 Nov" style="width:130px"></div></div>
+<div class="card" data-id="rules"><h2>Daily rules</h2>
+<div class="row"><span>Aptitude (min)</span><input value="45"></div>
+<div class="row"><span>Maths (min)</span><input value="90"></div>
+<div class="row"><span>Core (min)</span><input value="240"></div>
+<div class="row"><span>PYQs per day</span><input value="10"></div></div>
+</section>
+
+<section class="view" data-v="Subjects">
+<div class="card" data-id="subjects"><h2>Syllabus</h2><div class="note">Full list from your v10.1 data. Watched state will fill in from the pw-sync file.</div><div id="syl"></div></div>
+<div class="card" data-id="revq"><h2>Revision queue</h2><div class="mut">Operating Systems · Deadlocks · due +7 d<br>Fundamentals of C · Loops · due +21 d</div></div>
+</section>
+
+<section class="view" data-v="Tests">
+<div class="card" data-id="tests"><div class="row"><h2>Linear Algebra Weekly Test 01</h2><span class="num bad">2.71<small>/20</small></span></div>
+<div class="mut">4 correct · 9 wrong · 0 skipped · 30.8% accuracy</div>
+<div style="margin-top:8px">Marks lost to: <span class="tag">concept</span><span class="tag">calc</span><span class="tag">time</span><span class="tag">silly</span></div>
+<button class="btn" style="margin-top:10px">Tag errors</button></div>
+<div class="card" data-id="tlist"><h2>All tests</h2><div class="note">From v10.1 data (88 tests). Sync reports 95; the extra 7 arrive with the pw-sync file.</div><div id="tf" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0"></div><div id="tl"></div></div>
+</section>
+
+<section class="view" data-v="Settings">
+<div class="card" data-lock data-id="edit"><h2>Layout</h2><p class="mut">Edit mode lets you hide any card with ✕ and change fields in place. The verdict and Today cards stay.</p>
+<button class="btn" id="eb">Edit layout</button></div>
+<div class="card" data-lock data-id="hidden"><h2>Hidden cards</h2><div id="hl" class="mut">None hidden.</div></div>
+<div class="card" data-id="sync"><h2>Sync</h2><div class="mut">Up to date · import pw-sync JSON, export readable report (.md)</div>
+<div class="row" style="margin-top:8px;justify-content:flex-start"><button class="pill">Import</button><button class="pill">Export report</button><button class="pill">Sync now</button></div></div>
+</section>
+
+<script>
+const names={};let hidden=new Set(),edit=false;
+const V=[...document.querySelectorAll('.view')],nav=document.getElementById('nav');
+V.forEach((v,i)=>{const b=document.createElement('button');b.textContent=v.dataset.v;b.className=i?'':'on';b.onclick=()=>{V.forEach(x=>x.classList.toggle('on',x===v));[...nav.children].forEach(c=>c.classList.toggle('on',c===b))};nav.append(b)});
+document.querySelectorAll('.card').forEach(c=>{names[c.dataset.id]=(c.querySelector('h2')||{}).textContent||c.dataset.id;if(!c.hasAttribute('data-lock')){const x=document.createElement('button');x.className='x';x.textContent='✕';x.setAttribute('aria-label','Hide card');x.onclick=()=>{hidden.add(c.dataset.id);draw()};c.append(x)}});
+function draw(){document.querySelectorAll('.card').forEach(c=>c.style.display=hidden.has(c.dataset.id)?'none':'');
+const h=document.getElementById('hl');h.innerHTML=hidden.size?'':'None hidden.';hidden.forEach(id=>{const b=document.createElement('button');b.className='pill';b.style.margin='3px';b.textContent='Restore '+names[id];b.onclick=()=>{hidden.delete(id);draw()};h.append(b)})}
+document.getElementById('eb').onclick=e=>{edit=!edit;document.body.classList.toggle('edit',edit);e.target.textContent=edit?'Done editing':'Edit layout';document.querySelectorAll('input.f').forEach(i=>i.readOnly=!edit)};
+
+const $=id=>document.getElementById(id),D=626,O=197,LEFT=87;
+function calc(){const s=+$('sp').value,h=+$('hd').value||1,w=+$('wd').value||1,T=D/s+O,days=Math.ceil(T/h),f=new Date(2026,9,5+days),cov=Math.min(T,h*w),m=LEFT-days;
+$('co').innerHTML=`At ${s}x, ${Math.round(T)} h of work remain.<br>At ${h} h/day you finish in <b>${days} days</b> (${f.toLocaleDateString('en-GB',{day:'numeric',month:'short'})}), <b class="${m<0?'bad':'ok'}">${Math.abs(m)} days ${m<0?'late':'early'}</b> vs 31 Dec.<br>In ${w} days you cover <b>${Math.round(cov)} h</b> (${Math.round(cov/T*100)}%).<br>To finish by 31 Dec you need <b>${(T/LEFT).toFixed(1)} h/day</b>.`}
+['sp','hd','wd'].forEach(i=>$(i).oninput=calc);
+$('goal').oninput=e=>{const v=+e.target.value||1;$('g').textContent=v;$('tg').textContent=v;$('tb').style.width=Math.min(100,120/v)+'%';$('hd').value=v;calc()};
+calc();
+const SYL=[["Theory of Computation","live","2026-08-31","2026-10-09",0,[["DFA",7,1,"31 Aug","8 Sep"],["Regular Expression",5,1,"9 Sep","15 Sep"],["Regular Language",3,0,"16 Sep","18 Sep"],["Grammar",5,1,"21 Sep","25 Sep"],["Pushdown Automata & CFL",6,1,"28 Sep","6 Oct"],["Turing Machine",3,1,"7 Oct","9 Oct"]]],["DBMS","live","2026-08-31","2026-10-09",0,[["CH 01 · Relational Model & Normal Forms",7,1,"31 Aug","8 Sep"],["CH 02 · Queries",10,1,"10 Sep","23 Sep"],["CH 03 · ER Model",2,1,"24 Sep","25 Sep"],["CH 04 · Indexing",6,1,"28 Sep","5 Oct"],["CH 05 · Transaction & Concurrency Control (CS only)",4,1,"6 Oct","9 Oct"]]],["Operating System","live","2026-09-14","2026-10-25",0,[["Basics of OS",1,0,"15 Sep","15 Sep"],["Process Management",1,0,"16 Sep","16 Sep"],["CPU Scheduling",5,1,"17 Sep","22 Sep"],["Multithreading",1,1,"23 Sep","23 Sep"],["Process Synchronization",6,1,"24 Sep","9 Oct"],["Deadlock",3,1,"10 Oct","13 Oct"],["Memory Management",8,2,"14 Oct","22 Oct"],["File System",2,0,"23 Oct","24 Oct"],["Disk Scheduling Algorithm",1,1,"25 Oct","25 Oct"]]],["General Aptitude","live","2026-09-14","2026-10-10",0,[["Quantitative Aptitude",12,8,"15 Sep","30 Sep"],["Analytical Aptitude",6,6,"1 Oct","8 Oct"],["Spatial Aptitude",2,2,"9 Oct","10 Oct"]]],["Compiler Design","live","2026-10-12","2026-10-30",1,[["Lexical Analysis",1,0,"-","-"],["Parsing: LL(1), SLR, LR",1,0,"-","-"],["Syntax-Directed Translation",1,0,"-","-"],["Intermediate Code",1,0,"-","-"],["Code Optimisation (PYQ only)",1,0,"-","-"]]],["Data Structures","live","2026-10-12","2026-11-06",1,[["Arrays & Linked Lists",1,0,"-","-"],["Stacks & Queues",1,0,"-","-"],["Trees & BST",1,0,"-","-"],["Heaps",1,0,"-","-"],["Hashing",1,0,"-","-"],["Graph representation",1,0,"-","-"]]],["Discrete Mathematics","live","2026-10-26","2026-12-12",1,[["Mathematical Logic",1,0,"-","-"],["Set Theory & Relations",1,0,"-","-"],["Functions & Algebraic Structures",1,0,"-","-"],["Combinatorics",1,0,"-","-"],["Graph Theory",1,0,"-","-"]]],["Algorithms","live","2026-11-09","2026-12-25",1,[["Asymptotics & Recurrences",1,0,"-","-"],["Divide & Conquer",1,0,"-","-"],["Greedy",1,0,"-","-"],["Dynamic Programming",1,0,"-","-"],["Graph Algorithms",1,0,"-","-"],["Sorting & Searching",1,0,"-","-"],["NP-completeness",1,0,"-","-"]]],["Probability & Statistics","live","2026-10-26","2026-12-31",1,[["Conditional Probability & Bayes",1,0,"-","-"],["Random Variables",1,0,"-","-"],["Distributions (uniform, normal, exponential, Poisson, binomial)",1,0,"-","-"],["Mean, Median, Mode, SD",1,0,"-","-"],["Hypothesis Testing",1,0,"-","-"]]],["C Programming","rec","","",0,[["CH 01 · Language Processor & Intro",1,0,"—","—"],["CH 02 · Data Types and Operators",5,3,"—","—"],["CH 03 · Control Flow Statement",5,2,"—","—"],["CH 04 · Function & Storage Class",5,4,"—","—"],["CH 05 · Array and Pointer",5,3,"—","—"],["CH 06 · String",3,1,"—","—"],["CH 07 · Structure and Union",1,0,"—","—"]]],["Fundamentals of C","rec","","",0,[["CH 01 · Introduction",2,0,"—","—"],["CH 02 · Data Types & Operators",5,0,"—","—"],["CH 03 · Control Flow Statement",3,0,"—","—"],["CH 04 · Function & Storage Class",4,0,"—","—"],["CH 05 · Array & Pointer",4,0,"—","—"],["CH 06 · String & Structure",2,0,"—","—"]]],["Basics of Computer Systems","rec","","",0,[["CH 01 · Basics of Computer Systems",10,0,"—","—"]]],["COA","rec","","",0,[["CH 01 · Basics of COA",4,1,"—","—"],["CH 02 · Instruction & …",5,2,"—","—"],["CH 03 · CPU & Control Unit",3,1,"—","—"],["CH 04 · Floating Point",2,1,"—","—"],["CH 05 · IO Organization",3,1,"—","—"],["CH 06 · Memory Organization",2,1,"—","—"],["CH 07 · Cache Organization",9,2,"—","—"],["CH 08 · Pipeline Processing",5,1,"—","—"]]],["Calculus & Optimization","rec","","",0,[["CH 01 · Functions and Graphs",3,0,"—","—"],["CH 02 · Limit, Continuity & …",5,0,"—","—"],["CH 03 · Taylor & Maclaurin Series",1,0,"—","—"],["CH 04 · Mean Value Theorems",2,0,"—","—"],["CH 05 · Derivatives and Their Applications",3,0,"—","—"],["CH 06 · Maxima and Minima",3,0,"—","—"],["CH 07 · Integration",2,0,"—","—"]]],["Linear Algebra","rec","","",0,[["CH 01 · Basics of Determinants",3,0,"—","—"],["CH 02 · Rank and System of Equations",5,0,"—","—"],["CH 03 · Eigen Values and Eigen Vectors",5,0,"—","—"]]],["Foundation of Engineering Maths","rec","","",0,[["CH 01 · Prerequisites of Engineering Maths",25,0,"—","—"]]],["Verbal Aptitude","rec","","",0,[["CH 01 · Parts of Speech",2,1,"—","—"],["CH 02 · Vocabulary",2,1,"—","—"],["CH 03 · Reading Comprehension",1,1,"—","—"]]],["Computer Networks","rec","","",0,[["CH 01 · Introduction",4,1,"—","—"],["CH 02 · Network Delays",4,1,"—","—"],["CH 03 · Flow Control",8,1,"—","—"],["CH 04 · Transport Layer",15,2,"—","—"],["CH 05 · Application Layer",6,1,"—","—"],["CH 06 · IPv4 Address",11,1,"—","—"],["CH 07 · IPv4 Header",7,1,"—","—"],["CH 08 · Routing",5,1,"—","—"],["CH 09 · Error Control",8,1,"—","—"],["CH 10 · MAC Sublayer",1,0,"—","—"]]]],TS=[["mock1","Mock Test 01","mock","2024-02-28",100,180,65],["mock2","Mock Test 02","mock","2024-02-28",100,180,65],["mock3","Mock Test 03","mock","2024-02-28",100,180,65],["mock4","Mock Test 04","mock","2024-02-28",100,180,65],["mock5","Mock Test 05","mock","2024-02-28",100,180,65],["cprog-wt1","C Programming · Weekly Test 01","weekly","2025-08-24",25,45,15],["cprog-wt2","C Programming · Weekly Test 02","weekly","2025-08-31",25,45,15],["cprog-wt3","C Programming · Weekly Test 03","weekly","2025-09-07",25,45,15],["cprog-wt4","C Programming · Weekly Test 04","weekly","2025-09-14",25,45,15],["cprog-wt5","C Programming · Weekly Test 05","weekly","2025-09-21",30,45,20],["verbal-full","Verbal Aptitude · Full Syllabus Test","subject","2026-02-01",20,50,20],["twt1","TWT 01 : Programming in C","twt","2026-05-17",20,40,13],["twt2","TWT 02 : Programming in C","twt","2026-05-20",20,40,13],["twt3","TWT 03 : Algorithm","twt","2026-05-23",20,40,13],["twt4","TWT 04 : Algorithm","twt","2026-05-26",20,40,13],["twt5","TWT 05 : Theory of Computation","twt","2026-05-29",20,40,13],["twt6","TWT 06 : Theory of Computation","twt","2026-06-01",20,40,13],["twt7","TWT 07 : Computer Organization & Architecture","twt","2026-06-04",20,40,13],["linear-wt1","Linear Algebra · Weekly Test 01","weekly","2026-06-07",20,40,13],["twt8","TWT 08 : Computer Organization & Architecture","twt","2026-06-07",20,40,13],["twt9","TWT 09 : Engineering Mathematics","twt","2026-06-10",20,40,13],["twt10","TWT 10 : Engineering Mathematics","twt","2026-06-13",20,40,13],["twt11","TWT 11 : General Aptitude","twt","2026-06-16",20,40,13],["twt12","TWT 12 : General Aptitude","twt","2026-06-19",20,40,13],["twt13","TWT 13 : Database","twt","2026-06-22",20,40,13],["twt14","TWT 14 : Database","twt","2026-06-25",20,40,13],["twt15","TWT 15 : Computer Networks","twt","2026-06-28",20,40,13],["twt16","TWT 16 : Computer Networks","twt","2026-07-01",20,40,13],["twt17","TWT 17 : Data Structures","twt","2026-07-04",20,40,13],["twt18","TWT 18 : Data Structures","twt","2026-07-07",20,40,13],["twt19","TWT 19 : Compiler","twt","2026-07-10",20,40,13],["twt20","TWT 20 : Operating System","twt","2026-07-13",20,40,13],["twt21","TWT 21 : Operating System","twt","2026-07-16",20,40,13],["twt22","TWT 22 : Discrete Mathematics","twt","2026-07-19",20,40,13],["twt23","TWT 23 : Discrete Mathematics","twt","2026-07-22",20,40,13],["swt1","SWT 01 : Programming and Data Structures","swt","2026-07-29",40,72,26],["coa-wt1","COA · Weekly Test 01","weekly","2026-08-02",15,30,10],["swt2","SWT 02 : Theory Of Computation","swt","2026-08-02",40,72,26],["swt3","SWT 03 : Discrete Mathematics","swt","2026-08-06",40,72,26],["coa-wt2","COA · Weekly Test 02","weekly","2026-08-09",13,25,8],["swt4","SWT 04 : Computer Organization & Architecture","swt","2026-08-10",40,72,26],["swt5","SWT 05 : Engineering Maths","swt","2026-08-14",40,72,26],["coa-wt3","COA · Weekly Test 03","weekly","2026-08-16",10,40,9],["swt6","SWT 06 : General Aptitude","swt","2026-08-18",40,72,26],["swt7","SWT 07 : Algorithm","swt","2026-08-22",40,72,26],["coa-wt4","COA · Weekly Test 04","weekly","2026-08-23",15,40,10],["swt8","SWT 08 : Databases","swt","2026-08-26",40,72,26],["coa-wt5","COA · Weekly Test 05","weekly","2026-08-30",14,30,10],["swt9","SWT 09 : Computer Networks","swt","2026-08-30",40,72,26],["swt10","SWT 10 : Operating System","swt","2026-09-03",40,72,26],["coa-wt6","COA · Weekly Test 06","weekly","2026-09-06",11,20,7],["coa-wt7","COA · Weekly Test 07","weekly","2026-09-13",14,25,8],["dbms-wt1","DBMS · Weekly Test 01","weekly","2026-09-13",15,30,10],["swt12","SWT 12 : Compiler Design","swt","2026-09-13",40,72,26],["toc-wt1","Theory of Computation · Weekly Test 01","weekly","2026-09-13",18,30,11],["mst1","MST 1 : C + DS + ToC + Algorithms","mst","2026-09-20",60,110,39],["os-wt1","Operating Systems · Weekly Test 01","weekly","2026-09-20",20,60,12],["toc-wt2","Theory of Computation · Weekly Test 02","weekly","2026-09-20",15,30,10],["dbms-wt2","DBMS · Weekly Test 02","weekly","2026-09-27",20,30,10],["ga-wt1","General Aptitude · Weekly Test 01","weekly","2026-09-27",15,30,10],["mst2","MST 2 : General Maths + General Aptitude","mst","2026-09-27",60,110,39],["os-wt2","Operating Systems · Weekly Test 02","weekly","2026-09-27",20,30,12],["toc-wt3","Theory of Computation · Weekly Test 03","weekly","2026-09-27",20,30,12],["dbms-wt3","DBMS · Weekly Test 03","weekly","2026-10-04",15,35,11],["mst3","MST 3 : COA + DBMS + Computer Networks","mst","2026-10-04",60,110,39],["toc-wt4","Theory of Computation · Weekly Test 04","weekly","2026-10-04",27,30,16],["dbms-wt4","DBMS · Weekly Test 04","weekly","2026-10-11",15,30,10],["ga-wt2","General Aptitude · Weekly Test 02","weekly","2026-10-11",15,30,10],["mst4","MST 4 : Compiler + OS + Discrete Maths (+ Digital Logic, skipped)","mst","2026-10-11",60,110,39],["toc-wt5","Theory of Computation · Weekly Test 05","weekly","2026-10-11",20,30,13],["ga-wt3","General Aptitude · Weekly Test 03","weekly","2026-10-18",15,30,10],["gbg1","GBG 01 : Complete GATE Syllabus","gbg","2026-10-18",100,180,65],["gbg2","GBG 02 : Complete GATE Syllabus","gbg","2026-10-25",100,180,65],["pyq22","GATE PYQ Test 1 : GATE 2022","pyq","2026-10-30",100,180,65],["pyq23","GATE PYQ Test 2 : GATE 2023","pyq","2026-10-30",100,180,65],["pyq24","GATE PYQ Test 3 : GATE 2024","pyq","2026-10-30",100,180,65],["gbg3","GBG 03 : Complete GATE Syllabus","gbg","2026-11-01",100,180,65],["gbg4","GBG 04 : Complete GATE Syllabus","gbg","2026-11-15",100,180,65],["pyq25","GATE PYQ Test 4 : GATE 2025","pyq","2026-11-20",100,180,65],["pyq26","GATE PYQ Test 5 : GATE 2026","pyq","2026-11-20",100,180,65],["gbg5","GBG 05 : Complete GATE Syllabus","gbg","2026-11-22",100,180,65],["gbg6","GBG 06 : Complete GATE Syllabus","gbg","2026-11-29",100,180,65],["gbg7","GBG 07 : Complete GATE Syllabus","gbg","2026-12-06",100,180,65],["gbg8","GBG 08 : Complete GATE Syllabus","gbg","2026-12-13",100,180,65],["gbg9","GBG 09 : Complete GATE Syllabus","gbg","2026-12-20",100,180,65],["gbg10","GBG 10 : Complete GATE Syllabus","gbg","2026-12-27",100,180,65],["gbg11","GBG 11 : Complete GATE Syllabus","gbg","2027-01-03",100,180,65],["gbg12","GBG 12 : Complete GATE Syllabus","gbg","2027-01-10",100,180,65]],TODAY='2026-10-05';
+$('syl').innerHTML=SYL.map(([n,ty,st,en,ph,ch])=>{const L=ch.reduce((a,c)=>a+c[1],0),P=ch.reduce((a,c)=>a+c[2],0);
+return `<details style="border-top:1px solid var(--line);padding:6px 0"><summary style="cursor:pointer"><b>${n}</b> <span class="mut">${ph?ch.length+' topics · lectures not planned yet':L+' lectures · '+P+' DPPs'} · ${ty=='live'?'live':'recorded'}${st?' · '+st.slice(5)+' → '+en.slice(5):''}</span></summary>`+
+ch.map(c=>`<div class="row mut" style="padding:3px 0 3px 14px"><span>${c[0]}</span><span>${ph?'':c[1]+' lec'+(c[2]?' · '+c[2]+' DPP':'')+(c[3]&&c[3].length>1&&ty=='live'?' · '+c[3]:'')}</span></div>`).join('')+'</details>'}).join('');
+let kf='all';const K=['all',...new Set(TS.map(t=>t[2]))];
+function tl(){$('tf').innerHTML='';K.forEach(k=>{const b=document.createElement('button');b.className='pill'+(k==kf?' on':'');b.textContent=k;b.onclick=()=>{kf=k;tl()};$('tf').append(b)});
+$('tl').innerHTML=TS.filter(t=>kf=='all'||t[2]==kf).sort((a,b)=>a[3]<b[3]?-1:1).map(t=>{const st=t[0]=='linear-wt1'?['attempted','ok']:t[3]<TODAY?['missed','bad']:['upcoming','mut'];
+return `<div class="row" style="border-top:1px solid var(--line);padding:6px 0"><span>${t[1]}<br><span class="mut">${t[3]} · ${t[4]} marks · ${t[5]} min</span></span><span class="${st[1]}">${st[0]}</span></div>`}).join('')}
+tl();
+</script></body></html>

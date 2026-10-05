@@ -1,8 +1,8 @@
 // Pure sync helpers (no DOM, no network) so they can be unit-tested.
 
 // Keys that sync between devices. `log` is handled separately (per-device contributions, summed).
-// Device-local on purpose: timer, theme, notify, remindAt, lastRemind, trayClose, tbaMigrated.
-export const SYNCED = ['subjects', 'tests', 'mocks', 'pyq', 'rev', 'marks', 'rules', 'sched', 'revq', 'gantt', 'weights', 'target', 'goalH', 'targetDate', 'examDate', 'rule1Min', 'rule2Target', 'neglect', 'tsub', 'urgent', 'tPrior', 'plan'];
+// Device-local on purpose: timer, theme, notify, remindAt, lastRemind, trayClose, layout, tbaMigrated.
+export const SYNCED = ['subjects', 'tests', 'mocks', 'pyq', 'rev', 'marks', 'rules', 'sched', 'revq', 'gantt', 'weights', 'target', 'goalH', 'targetDate', 'examDate', 'rule1Min', 'rule2Target', 'neglect', 'tsub', 'urgent', 'tPrior', 'plan', 'pwSync'];
 
 export const hash = (v) => {
   const s = JSON.stringify(v) ?? 'u'; let h = 5381;

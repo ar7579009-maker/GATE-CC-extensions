@@ -139,187 +139,104 @@ export function mergeTests(cur, inc) {
   return out;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   PW Extension import  (reads files the extension saved to PW-GATE/data/)
-   ─────────────────────────────────────────────────────────────────────── */
+/* ───────── PW sync (kind: 'pw-sync', version 3) ───────── */
+export const PW_SUBJECT_MAP = {
+  'operating systems': 'os', 'theory of computation': 'toc', 'database management system': 'dbms', 'database management systems': 'dbms', dbms: 'dbms',
+  'general aptitude': 'ga', 'verbal aptitude': 'verbal', 'c programming': 'cprog', 'fundamentals of c': 'fundc', 'fundamental of c language': 'fundc', 'fundamentals of c language': 'fundc',
+  'basics of computer system': 'bcs', 'basics of computer systems': 'bcs', 'computer networks': 'cn',
+  'computer organization and architecture': 'coa', 'computer organisation and architecture': 'coa', coa: 'coa',
+  'calculus and optimization': 'calculus', 'linear algebra': 'linear',
+  'foundation of engineering math': 'engmaths', 'foundation of engineering maths': 'engmaths', 'foundation engineering math': 'engmaths', 'foundation engineering maths': 'engmaths',
+};
+const normName = (t) => String(t || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
+const normChapter = (t) => normName(String(t || '').replace(/^\s*ch(?:apter)?\s*0*\d+\s*[·:.\-–]?\s*/i, ''));
+const normTest = (t) => String(t || '').toLowerCase().replace(/[:·]/g, ' ').replace(/\s+/g, ' ').trim();
+const dayOf = (iso) => (iso ? String(iso).slice(0, 10) : '');
+const subjectId = (name) => PW_SUBJECT_MAP[normName(name)] || null;
 
-// Status string from a lecture item's "status" field in the extension data
-const DONE_STATUS = /^(watch again|resume)$/i;
+export function isPwSync(o) { return !!o && o.kind === 'pw-sync' && Array.isArray(o.subjects); }
 
-// Convert a chapter file (version 2 JSON) into ticked/unticked lectures
-// Returns { subjectName, chapterName, lectures: [{name, done}] }
-function chapterFileToLectures(obj) {
-  if (!obj || obj.kind !== 'chapter') return null;
-  const items = obj.lectures?.items;
-  if (!Array.isArray(items) || !items.length) return null;
-  return {
-    subjectName: String(obj.subject || '').trim(),
-    chapterName: String(obj.chapter || '').trim(),
-    sfx: obj.duplicateName ? (obj.lectures?.sfx || '') : '',
-    lectures: items.map((it) => ({
-      name: String(it.title || it.name || '').trim(),
-      done: DONE_STATUS.test(String(it.status || '')),
-    })).filter((l) => l.name),
-  };
-}
+export function applyPwSync(state, snap) {
+  const report = { ticked: 0, lecturesMatched: 0, newTests: 0, updatedTests: 0, newResults: 0, updatedResults: 0, unmatched: [], mismatch: [] };
+  const subjects = (state.subjects || []).map((s) => s);          // copy-on-write below
+  const byId = new Map(subjects.map((s, i) => [s.id, i]));
 
-// Convert the extension's dashboard JSON into a summary object
-// Returns { date, subjectRows: [{name, lecturesDone, lecturesTotal}], tests: {...} | null }
-function parseDashboardFile(obj) {
-  if (!obj || obj.kind !== 'dashboard') return null;
-  const subjects = (obj.subjects || []).map((s) => ({
-    name: String(s.name || '').trim(),
-    lecturesDone: Array.isArray(s.lectures) ? s.lectures[0] : 0,
-    lecturesTotal: Array.isArray(s.lectures) ? s.lectures[1] : 0,
-  })).filter((s) => s.name);
-  return {
-    date: obj.updated ? obj.updated.slice(0, 10) : '',
-    subjects,
-    tests: obj.tests || null,
-  };
-}
-
-// Convert extension test files (tests-batch.json / tests-series.json) to GCC test format
-function parseTestFile(obj, existingTests) {
-  if (!obj || obj.kind !== 'tests' || !Array.isArray(obj.tests)) return [];
-  const isoDate = (s) => {
-    if (!s) return '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    return s;
-  };
-  return obj.tests
-    .filter((t) => t && String(t.name || '').trim())
-    .map((t) => ({
-      id: t.id ? String(t.id) : slug(t.name),
-      name: String(t.name).trim(),
-      date: isoDate(t.when?.date || t.date || ''),
-      marks: t.marks || 100,
-      _state: String(t.state || '').toLowerCase(), // 'missed' | 'upcoming' | 'live' | 'attempted'
-    }));
-}
-
-// Given a set of chapter file payloads and current subjects, build a
-// map of subject → { [chapterName]: [{name,done}] } covering only the
-// chapters whose done status differs from what is already ticked.
-function buildTickDelta(chapterPayloads, curSubjects) {
-  const bySubCh = {}; // subject_lower → chapter_lower → [{name,done}]
-  for (const p of chapterPayloads) {
-    const r = chapterFileToLectures(p);
-    if (!r) continue;
-    const sk = r.subjectName.toLowerCase(), ck = r.chapterName.toLowerCase();
-    if (!bySubCh[sk]) bySubCh[sk] = {};
-    bySubCh[sk][ck] = r.lectures;
-  }
-  // For each current subject, see how many extra ticks exist in PW vs app
-  const deltas = []; // {subjectName, chapterName, toTick: number, total: number}
-  for (const sub of curSubjects) {
-    const sk = sub.name.toLowerCase();
-    const pwSub = bySubCh[sk] || bySubCh[Object.keys(bySubCh).find((k) => k.includes(sk.split(' ')[0])) || ''];
-    if (!pwSub) continue;
-    for (const ch of sub.chapters) {
-      const ck = ch.name.toLowerCase();
-      const pwLecs = pwSub[ck] || pwSub[Object.keys(pwSub).find((k) => k.includes(ck.split(' ')[0])) || ''];
-      if (!pwLecs) continue;
-      let toTick = 0;
-      for (let i = 0; i < ch.lectures.length && i < pwLecs.length; i++) {
-        if (!ch.lectures[i].done && pwLecs[i].done) toTick++;
-      }
-      if (toTick > 0) deltas.push({ subjectName: sub.name, chapterName: ch.name, toTick, total: ch.lectures.length });
-    }
-  }
-  return { bySubCh, deltas };
-}
-
-/**
- * parsePWFiles — main entry point.
- * @param {Array<{name: string, text: string}>} files  — file contents loaded by the UI
- * @param {Array} curSubjects — current app subjects
- * @param {Array} curTests — current app tests
- * @returns {Object} preview payload fed to the ImportFromPW component
- */
-export function parsePWFiles(files, curSubjects, curTests) {
-  const byName = {};
-  for (const f of files) byName[f.name.toLowerCase()] = f.text;
-
-  const chapterPayloads = [];
-  let dashPayload = null, batchPayload = null, seriesPayload = null;
-
-  for (const f of files) {
-    let obj;
-    try { obj = JSON.parse(f.text); } catch { continue; }
-    const n = f.name.toLowerCase();
-    if (n === 'dashboard.json' || obj.kind === 'dashboard') { dashPayload = obj; continue; }
-    if (n === 'tests-batch.json' || (obj.kind === 'tests' && obj.source === 'batch')) { batchPayload = obj; continue; }
-    if (n === 'tests-series.json' || (obj.kind === 'tests' && obj.source === 'series')) { seriesPayload = obj; continue; }
-    if (obj.kind === 'chapter') { chapterPayloads.push(obj); continue; }
-    // index.json — extract embedded lectures array
-    if (obj.kind === undefined && Array.isArray(obj.lectures)) {
-      for (const lec of obj.lectures) {
-        if (lec.subject && lec.chapter && Array.isArray(lec.items)) {
-          chapterPayloads.push({ kind: 'chapter', subject: lec.subject, chapter: lec.chapter, duplicateName: lec.duplicateName, lectures: lec });
-        }
-      }
-    }
-  }
-
-  const dashboard = dashPayload ? parseDashboardFile(dashPayload) : null;
-  const { bySubCh, deltas } = buildTickDelta(chapterPayloads, curSubjects);
-
-  const batchTests = batchPayload ? parseTestFile(batchPayload, curTests) : [];
-  const seriesTests = seriesPayload ? parseTestFile(seriesPayload, curTests) : [];
-  const allNewTests = [...batchTests, ...seriesTests];
-  const newTestCount = allNewTests.filter((t) => !curTests.some((x) => sameTest(x, t))).length;
-  const updTestCount = allNewTests.filter((t) => curTests.some((x) => sameTest(x, t))).length;
-
-  const totalToTick = deltas.reduce((a, d) => a + d.toTick, 0);
-  const chaptersRead = chapterPayloads.length;
-  const hasData = totalToTick > 0 || allNewTests.length > 0;
-
-  return {
-    hasData,
-    chaptersRead,
-    dashboard,
-    deltas,      // [{subjectName, chapterName, toTick, total}] — only subjects with new ticks
-    totalToTick,
-    allTests: allNewTests,
-    newTestCount,
-    updTestCount,
-    _bySubCh: bySubCh,  // internal for apply
-    _chapterPayloads: chapterPayloads,
-  };
-}
-
-/**
- * applyPWImport — called when user clicks Apply in the ImportFromPW modal.
- * Ticks lectures (never un-ticks), merges tests.
- */
-export function applyPWImport(preview, curSubjects, curTests, { includeTicks, includeTests }) {
-  let subjects = curSubjects;
-  if (includeTicks && preview.deltas.length) {
-    subjects = curSubjects.map((sub) => {
-      const sk = sub.name.toLowerCase();
-      const pwSub = preview._bySubCh[sk] || preview._bySubCh[Object.keys(preview._bySubCh).find((k) => k.includes(sk.split(' ')[0])) || ''];
-      if (!pwSub) return sub;
-      return {
-        ...sub,
-        chapters: sub.chapters.map((ch) => {
-          const ck = ch.name.toLowerCase();
-          const pwLecs = pwSub[ck] || pwSub[Object.keys(pwSub).find((k) => k.includes(ck.split(' ')[0])) || ''];
-          if (!pwLecs) return ch;
-          return {
-            ...ch,
-            lectures: ch.lectures.map((l, i) => ({
-              ...l,
-              done: l.done || !!(pwLecs[i]?.done),  // never un-tick
-            })),
-          };
-        }),
-      };
+  for (const ps of snap.subjects || []) {
+    if (/^(digital logic|starter kit|notices)$/.test(normName(ps.name))) continue;
+    if (!(ps.chapters || []).length) continue;
+    const id = subjectId(ps.name);
+    if (!id || !byId.has(id)) { report.unmatched.push(ps.name); continue; }
+    const i = byId.get(id), app = subjects[i];
+    const used = new Set();
+    const pwByName = new Map();
+    (ps.chapters || []).forEach((pc, k) => { const n = normChapter(pc.name); if (!pwByName.has(n)) pwByName.set(n, k); });
+    const chapters = app.chapters.map((ac, ci) => {
+      let k = pwByName.get(normChapter(ac.name));
+      if (k == null || used.has(k)) k = (ps.chapters[ci] && !used.has(ci)) ? ci : null;
+      if (k == null) { report.mismatch.push(`${app.name} › ${ac.name} (no PW chapter)`); return ac; }
+      used.add(k);
+      const pcs = ps.chapters[k].lectures || [];
+      const n = Math.min(pcs.length, ac.lectures.length);
+      if (pcs.length !== ac.lectures.length) report.mismatch.push(`${app.name} › ${ac.name} (app ${ac.lectures.length}, PW ${pcs.length})`);
+      const lectures = ac.lectures.map((l, li) => {
+        if (li >= n) return l;
+        const p = pcs[li]; report.lecturesMatched++;
+        const nl = { ...l, pw: p.state, dur: p.durSec };
+        if (p.state === 'done' && !l.done) { nl.done = true; report.ticked++; }
+        return nl;
+      });
+      return { ...ac, lectures };
     });
+    subjects[i] = { ...app, chapters };
   }
-  let tests = curTests;
-  if (includeTests && preview.allTests.length) {
-    tests = mergeTests(curTests, preview.allTests.map(({ _state, ...t }) => t));
+
+  // tests
+  const tests = [...(state.tests || [])];
+  const idxByName = new Map(), idxById = new Map();
+  tests.forEach((t, i) => { idxByName.set(normTest(t.name), i); idxById.set(t.id, i); });
+  const testFor = new Map();   // pw test id -> app test id
+  for (const pt of snap.tests || []) {
+    let i = idxByName.get(normTest(pt.name));
+    if (i == null) i = idxById.get(pt.id);
+    const date = dayOf(pt.start);
+    if (i != null) {
+      const t = tests[i];
+      tests[i] = { ...t, ...(date ? { date } : {}), ...(pt.marks != null ? { marks: pt.marks } : {}), ...(pt.mins != null ? { mins: pt.mins } : {}), pwId: pt.id };
+      testFor.set(pt.id, t.id); report.updatedTests++;
+    } else {
+      const t = { id: 'pw-' + pt.id, name: pt.name, date, marks: pt.marks, mins: pt.mins, q: pt.q, source: 'pw', pwId: pt.id };
+      tests.push(t); idxByName.set(normTest(t.name), tests.length - 1); idxById.set(t.id, tests.length - 1);
+      testFor.set(pt.id, t.id); report.newTests++;
+    }
   }
-  return { subjects, tests };
+
+  // results -> mocks
+  const mocks = [...(state.mocks || [])];
+  const mIdx = new Map(); mocks.forEach((m, i) => { if (m.pwResultId) mIdx.set(m.pwResultId, i); });
+  let attempted = 0;
+  for (const r of snap.results || []) {
+    const key = r.mappingId || `${r.testId}#${r.attemptNo || 1}`;
+    attempted++;
+    const f = { test: testFor.get(r.testId) || 'custom', name: r.name, date: dayOf(r.endedAt), score: r.score, max: r.max, correct: r.correct, incorrect: r.incorrect, skipped: r.skipped, accuracy: r.accuracy, timeSec: r.timeSec };
+    if (mIdx.has(key)) { mocks[mIdx.get(key)] = { ...mocks[mIdx.get(key)], ...f }; report.updatedResults++; }
+    else { mocks.push({ id: 'pwr-' + key, pwResultId: key, ...f }); mIdx.set(key, mocks.length - 1); report.newResults++; }
+  }
+
+  const subj = {};
+  for (const ps of snap.subjects || []) {
+    const id = subjectId(ps.name);
+    if (id && ps.pw) subj[id] = { total: ps.pw.total, completed: ps.pw.completed, pct: ps.pw.pct };
+  }
+  const pwSync = { updated: snap.updated, batchName: snap.batch?.name || '', totals: snap.totals || {}, subjects: subj, testCount: (snap.tests || []).length, attempted };
+  return { subjects, tests, mocks, pwSync, report };
+}
+
+// Auto-import gate: only apply a snapshot that is valid and newer than the last applied one.
+export function parsePwText(text) { try { const o = JSON.parse(text); return isPwSync(o) ? o : null; } catch { return null; } }
+export const pwIsNewer = (snap, last) => !!snap && (!last?.updated || Date.parse(snap.updated) > Date.parse(last.updated));
+export function pwToast(report) {
+  const w = [];
+  if (report.unmatched.length) w.push(`unmatched: ${report.unmatched.join(', ')}`);
+  if (report.mismatch.length) w.push(`${report.mismatch.length} chapter mismatch${report.mismatch.length > 1 ? 'es' : ''}`);
+  return { msg: `PW synced: ${report.ticked} lecture${report.ticked === 1 ? '' : 's'} done`, warn: w.join(' · ') };
 }

@@ -50,12 +50,14 @@ jobs:
         with:
           node-version: 20
       - run: npm install
+      - run: npm test
       - run: npm run dist -- --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: GATE-Command-Center-windows
           path: |
             dist/*.exe
+          if-no-files-found: error
 
   html:
     runs-on: ubuntu-latest

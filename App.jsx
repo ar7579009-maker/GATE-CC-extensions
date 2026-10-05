@@ -3,13 +3,15 @@ import { createRoot } from 'react-dom/client';
 import { SUBJECTS, MARKS_MAP, TESTS } from './data.js';
 import { useSync, SyncCard } from './sync.jsx';
 import { saveResilient, loadResilient } from './sync-core.js';
-import { mastery, DEFAULT_PRIOR } from './readiness-core.js';
-import { buildPlan } from './planner.js';
-import { PlanView, PlannerSettings } from './plan-ui.jsx';
+import { buildPlan, mastery, DEFAULT_PRIOR } from './planner.js';
+import { Verdict, PaceCalc, TodayList, PlanOutlook, PlannerSettings } from './plan-ui.jsx';
 import { setupNative, saveFile } from './native.js';
 import { setupWeb } from './pwa.js';
 import { Num, Inline, InlineDate } from './ui.js';
-import { rowFor, parseSyllabus, mergeSubjects, countMatches, parseTests, mergeTests, countTestMatches, parsePWFiles, applyPWImport } from './io.js';
+import { rowFor, parseSyllabus, mergeSubjects, countMatches, parseTests, mergeTests, countTestMatches, applyPwSync, isPwSync, parsePwText, pwIsNewer, pwToast } from './io.js';
+import { CARDS, cleanLayout, isHidden, hideCard, restoreCard, hiddenList } from './layout.js';
+import { KINDS, STATUSES, filterTests, countBy } from './tests-view.js';
+import { chapterStats, subjectStats, fmtLeft } from './syllabus-stats.js';
 import { useTimerEngine, TimerCard, MiniBar, Stats, tSeg, tTotal } from './timer.jsx';
 
 /* ======== merged from extras.jsx ======== */
@@ -267,7 +269,7 @@ export const catLabel = (t) => CAT_LABEL[t] || 'LIVE';
 export function readableSummary(s, R, today) {
   const L = [`# GATE CSE 2027 — ${today}`, '', `Days to exam (${s.examDate}): ${Math.max(0, diff(s.examDate, dk()))}`,
     `Days to syllabus-complete target (${s.targetDate}): ${Math.max(0, diff(s.targetDate, dk()))}`,
-    `Weighted readiness: ${(R.pct*100).toFixed(1)}% (${R.marks.toFixed(0)} marks, target ${s.target})`, '', '## Subjects'];
+    '', '## Subjects'];
   R.rows.forEach((r) => L.push(`- ${r.name}: ${r.d}/${r.t} lectures, PYQ attempted ${Math.round((r.pyq||0)*100)}%, test score ${r.rev == null ? 'no data' : Math.round(r.rev*100)+'%'} → mastery ${(r.score*100).toFixed(0)}% (${r.label}${r.urgent ? ', URGENT' : ''})`));
   if (s.mocks.length) { L.push('', '## Mocks'); [...s.mocks].slice(-5).forEach((m) => L.push(`- ${m.date} ${m.name}: ${m.score}/${m.max}`)); }
   const due = (s.revq || []).filter((r) => r.done.includes(false));
@@ -310,7 +312,6 @@ export function SubjectGantt({ s, set }) {
   );
 }
 
-/* ── smart readiness calculator: editable coverage/PYQ/revision weights ── */
 /* ── one-time: split the old combined "Discrete Maths + Probability" into two subjects ── */
 export function splitDiscProb(p) {
   if (p.discProbSplit) return p;
@@ -343,12 +344,6 @@ const READY_MATH = ['disc', 'prob', 'linalg', 'calc'];
 export const sortSubjects = (list) => {
   const k = (x) => (MATH_IDS.has(x.id) ? 100 : 0) + (ORDER.indexOf(x.id) < 0 ? 99 : ORDER.indexOf(x.id));
   return [...list].sort((a, b) => k(a) - k(b));
-};
-export const sortReadyRows = (rows) => {
-  const T = rows.filter((r) => r.id !== 'ga' && !READY_MATH.includes(r.id)).sort((a, b) => b.marks - a.marks);
-  const A = rows.filter((r) => r.id === 'ga');
-  const M = rows.filter((r) => READY_MATH.includes(r.id)).sort((a, b) => b.marks - a.marks);
-  return [...T, ...A, ...M];
 };
 const readySec = (r) => (r.id === 'ga' ? 'A' : READY_MATH.includes(r.id) ? 'M' : 'T');
 export function GroupHead({ prev, cur, ready }) {
@@ -385,7 +380,7 @@ export function MockTrend({ s }) {
 /* ───────── constants & helpers ───────── */
 const KEY = 'gcc2027_v1';
 const ROWS = MARKS_MAP;
-const DEF = { log: {}, timer: null, tsub: 'os', tmode: 'free', tcustom: 45, breakMin: 5, sessions: [], pyq: {}, rev: {}, marks: {}, mocks: [], rules: {}, target: 65, goalH: 6, sched: {}, revq: [], theme: 'dark', notify: true, remindAt: '20:00', lastRemind: '', neglect: 5, trayClose: true, targetDate: '2026-12-31', examDate: '2027-02-06', rule1Min: 30, rule2Target: 1, gantt: {}, plan: {}, schemaVersion: 10, weights: { cov: 40, pyq: 30, rev: 30 }, urgent: {}, tPrior: 50, tbaMigrated: false };
+const DEF = { log: {}, timer: null, tsub: 'os', tmode: 'free', tcustom: 45, breakMin: 5, sessions: [], pyq: {}, rev: {}, marks: {}, mocks: [], rules: {}, target: 65, goalH: 6, sched: {}, revq: [], theme: 'dark', notify: true, remindAt: '20:00', lastRemind: '', neglect: 5, trayClose: true, targetDate: '2026-12-31', examDate: '2027-02-06', rule1Min: 30, rule2Target: 1, gantt: {}, plan: {}, schemaVersion: 10, weights: { cov: 40, pyq: 30, rev: 30 }, urgent: {}, tPrior: 50, tbaMigrated: false, layout: { hidden: [] } };
 const seed = (done) => SUBJECTS.map((x) => ({
   id: x.id, name: x.name, type: x.type === 'rec' ? 'rec' : 'live', row: rowFor(x.id), ...(x.start ? { start: x.start } : {}), ...(x.end ? { end: x.end } : {}),
   chapters: x.chapters.map((c, ci) => ({ ...c, name: c.name, lectures: c.lectures.map((l, li) => ({ ...l, done: !!done[`${x.id}__${ci}__${li}`] })) })),
@@ -395,6 +390,7 @@ const hydrate = (p) => {
   if (!Array.isArray(p.subjects)) s.subjects = seed(p.done || {});
   if (!Array.isArray(p.tests)) s.tests = TESTS.map((t) => ({ ...t }));
   delete s.done;
+  if (typeof s.tmode === 'number') { s.tcustom = s.tmode; s.tmode = 'custom'; }   // v10.2: presets dropped, one countdown left
   return s;
 };
 // One-time: bring saved v7 data up to the v8 dataset (18 subjects, 88 tests, Digital Logic skipped) without losing ticks.
@@ -459,6 +455,26 @@ function readiness(s) {
   const pct = rows.reduce((a, r) => a + r.marks * r.score, 0) / total;
   return { rows, pct, marks: pct * 100, total };
 }
+/* ── layout: hide cards (display only; data and math keep running) ── */
+const LayoutCtx = React.createContext({ edit: false, hidden: [], hide: () => {} });
+function Hideable({ id, children }) {
+  const { edit, layout, hide } = React.useContext(LayoutCtx);
+  if (isHidden(layout, id)) return null;
+  if (!edit) return <>{children}</>;
+  return <div style={{ position: 'relative' }}>{children}
+    <button aria-label={`Hide ${CARDS[id]}`} title={`Hide ${CARDS[id]}`} onClick={() => hide(id)} style={{ position: 'absolute', top: 8, right: 8, zIndex: 5, width: 26, height: 26, borderRadius: 13, border: '1px solid var(--line)', background: 'var(--panel2)', color: 'var(--ink)', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+  </div>;
+}
+function LayoutCard() {
+  const { edit, setEdit, layout, restore } = React.useContext(LayoutCtx);
+  const list = hiddenList(layout);
+  return <div className="card">
+    <div className="row sb"><h3>Layout</h3><button className={`btn ${edit ? '' : 'ghost'}`} onClick={() => setEdit(!edit)}>{edit ? 'Done editing' : 'Edit layout'}</button></div>
+    <div className="mute small" style={{ marginTop: 6 }}>{edit ? 'Open Today or Plan: tap ✕ on a card to hide it. Goal, dates and rule values are editable in place. The verdict and Today list stay.' : 'Hiding a card only hides it; your data and the planner math keep running.'}</div>
+    <h3 style={{ marginTop: 12 }}>Hidden cards</h3>
+    {list.length ? list.map((c) => <div key={c.id} className="row sb" style={{ marginTop: 6 }}><span>{c.name}</span><button className="btn sm ghost" onClick={() => restore(c.id)}>Restore</button></div>) : <div className="mute small">None hidden.</div>}
+  </div>;
+}
 const norm = (m) => (m.score / m.max) * 100;
 function useNow(on) {
   const [n, setN] = useState(Date.now());
@@ -470,48 +486,72 @@ const Bar = ({ v, c = '' }) => <div className={`bar ${c}`}><i style={{ width: `$
 /* ───────── app ───────── */
 function App() {
   const [s, setS] = useState(load);
+  const platform = document.body.dataset.platform || 'web'; // 'win' | 'mobile' | 'web'
   const [tab, setTab] = useState('today');
   const [panel, setPanel] = useState(false);
+  const [edit, setEdit] = useState(false);
+  const layoutCtx = { edit, setEdit, layout: cleanLayout(s.layout), hide: (id) => setS((p) => ({ ...p, layout: hideCard(p.layout, id) })), restore: (id) => setS((p) => ({ ...p, layout: restoreCard(p.layout, id) })) };
+  // Expose tab setter to the HTML shell nav buttons
+  useEffect(() => { window.__gccSetTab = setTab; return () => { delete window.__gccSetTab; }; }, [setTab]);
   const [saveErr, setSaveErr] = useState(false);
   useEffect(() => { const r = saveResilient(localStorage, KEY, s); setSaveErr(!r.ok); if (!r.ok) console.error('SAVE FAILED', r.why); }, [s]);
   const set = (k, v) => setS((p) => ({ ...p, [k]: typeof v === 'function' ? v(p[k]) : v }));
   usePolish(s, setS);
   const eng = useTimerEngine({ s, setS, set, tab, rows: ROWS });
   const sync = useSync(s, setS, () => normalize({}));
+  const D = usePlanData(s, eng);
+  const sRef = useRef(s); sRef.current = s;
+  const [pwMsg, setPwMsg] = useState(null);
+  useEffect(() => {
+    const G = window.gcc; if (!G?.pwLatest) return;
+    const take = (text) => {
+      const snap = text && parsePwText(text);
+      if (!snap || !pwIsNewer(snap, sRef.current.pwSync)) return;
+      const r = applyPwSync(sRef.current, snap);
+      sRef.current = { ...sRef.current, subjects: r.subjects, tests: r.tests, mocks: r.mocks, pwSync: r.pwSync };   // guards a duplicate push before re-render
+      setS((p) => { const q = applyPwSync(p, snap); return { ...p, subjects: q.subjects, tests: q.tests, mocks: q.mocks, pwSync: q.pwSync }; });   // recompute on latest state so concurrent ticks aren't lost
+      const t = pwToast(r.report); setPwMsg({ msg: t.msg, warn: t.warn });
+    };
+    G.pwLatest().then(take).catch(() => {});
+    return G.onPwSnapshot(take);
+  }, []);
+  useEffect(() => { if (!pwMsg) return; const i = setTimeout(() => setPwMsg(null), pwMsg.warn ? 12000 : 5000); return () => clearTimeout(i); }, [pwMsg]);
   useEffect(() => { setupWeb(); }, []);
   useEffect(() => { setupNative(s); }, [s.notify, s.remindAt]);
   useEffect(() => { setS(syncRevq); }, [s.subjects]);
-  const tabs = [['today', 'Today'], ['syllabus', 'Syllabus'], ['ready', 'Readiness'], ['tests', 'Tests']];
-  return (
+  const tabs = [['today', 'Today'], ['syllabus', 'Syllabus'], ['tests', 'Tests']];
+  return (<LayoutCtx.Provider value={layoutCtx}>
     <div className="shell">
       <main><div className="wrap">
-        {saveErr && <div className="card" role="alert" style={{ borderColor: 'var(--red)', color: 'var(--red)' }}>Couldn't save to this device (storage full or blocked). Open ⚙ and export a backup now.</div>}
-        {tab === 'today' && <><Today s={s} set={set} setS={setS} sync={sync} eng={eng} /><h2 style={{ margin: '18px 2px 8px' }}>Plan</h2><Plan s={s} set={set} /></>}
+        {saveErr && <div className="card" role="alert" style={{ borderColor: 'var(--red)', color: 'var(--red)' }}>Couldn't save to this device (storage full or blocked). Open Settings and export a backup now.</div>}
+        {tab === 'today' && <><Today s={s} set={set} eng={eng} D={D} />{platform !== 'win' && <><h2 style={{ margin: '18px 2px 8px' }}>Plan</h2><PlanTab s={s} set={set} D={D} /></>}</>}
+        {tab === 'plan' && <PlanTab s={s} set={set} D={D} />}
         {tab === 'syllabus' && <Syllabus s={s} set={set} />}
-        {tab === 'ready' && <><Ready s={s} set={set} /><h2 style={{ margin: '18px 2px 8px' }}>Stats &amp; history</h2><Stats s={s} rows={ROWS} /></>}
         {tab === 'tests' && <Mocks s={s} set={set} />}
       </div></main>
-      {tab !== 'today' && <MiniBar eng={eng} go={() => setTab('today')} />}
+      {pwMsg && <div className="toast" role="status" onClick={() => setPwMsg(null)} style={{ position: 'fixed', left: 12, right: 12, bottom: 12, zIndex: 50 }}><span>{pwMsg.msg}{pwMsg.warn && <span style={{ color: 'var(--amber)' }}> · {pwMsg.warn} (see Settings)</span>}</span></div>}
+      {tab !== 'today' && platform === 'web' && <MiniBar eng={eng} go={() => setTab('today')} />}
       {panel && <div className="sheet" onClick={() => setPanel(false)}><div className="sheetin" onClick={(e) => e.stopPropagation()}>
         <div className="row sb" style={{ marginBottom: 12 }}><h2 style={{ margin: 0 }}>Settings &amp; data</h2><button className="btn sm ghost" onClick={() => setPanel(false)}>Close</button></div>
-        <Settings s={s} set={set} /><PlannerSettings s={s} set={set} /><SyncCard sync={sync} /><ImportFromPW s={s} setS={setS} /><DataCard s={s} setS={setS} />
+        <Settings s={s} set={set} /><LayoutCard /><PlannerSettings s={s} set={set} /><SyncCard sync={sync} /><ImportFromPW s={s} setS={setS} /><DataCard s={s} setS={setS} />
       </div></div>}
-      <nav>{tabs.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}<button className="gearbtn" title="Settings & data" onClick={() => setPanel(true)}>⚙</button></nav>
+      {/* settings tab for win/mobile shells (no gear button in their nav) */}
+      {tab === 'settings' && platform !== 'web' && <div className="sheetin" style={{ padding: '0 0 20px' }}>
+        <Settings s={s} set={set} /><LayoutCard /><PlannerSettings s={s} set={set} /><SyncCard sync={sync} /><ImportFromPW s={s} setS={setS} /><DataCard s={s} setS={setS} />
+      </div>}
+      {platform === 'web' && <nav>{tabs.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}<button className="gearbtn" title="Settings & data" onClick={() => setPanel(true)}><svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 20, height: 20, fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round', display: 'block', margin: '0 auto' }}><circle cx="12" cy="12" r="3" /><path d="M12 2.8v2.6M12 18.6v2.6M4.6 7.4l2.2 1.3M17.2 15.3l2.2 1.3M4.6 16.6l2.2-1.3M17.2 8.7l2.2-1.3" /></svg></button></nav>}
     </div>
-  );
+  </LayoutCtx.Provider>);
 }
 
 /* ───────── Today: timer + daily log ───────── */
-function Today({ s, set, setS, sync, eng }) {
+/* ── shared per-day numbers + the plan (used by Today and Plan) ── */
+function usePlanData(s, eng) {
   const today = dkey();
   const tm = eng.t, elapsed = tm && tm.mode !== 'break' ? tSeg(tm, eng.now) : 0;
   const logToday = { ...(s.log[today] || {}) };
   if (elapsed && dkey(new Date(tm.ts)) === today) logToday[tm.sub] = (logToday[tm.sub] || 0) + elapsed;
-  const todaySec = sum(logToday), goal = s.goalH * 3600;
-  const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); const k = dkey(d); return [k, k === today ? todaySec : sum(s.log[k])]; });
-  let streak = 0;
-  for (let i = 0; i < 400; i++) { const d = new Date(); d.setDate(d.getDate() - i); const k = dkey(d); const v = k === today ? todaySec : sum(s.log[k]); if (v >= 1800) streak++; else if (i > 0) break; }
-  const gaOk = (logToday.ga || 0) >= s.rule1Min * 60, pyqCount = s.rules[today]?.pyqCount || 0, pyqOk = pyqCount >= s.rule2Target;
+  const todaySec = sum(logToday), pyqCount = s.rules[today]?.pyqCount || 0;
   const R = useMemo(() => readiness(s), [s.subjects, s.mocks, s.marks, s.weights, s.log, s.sched]);
   const grp = (id) => (id === 'ga' ? 'ga' : READY_MATH.includes(id) ? 'ma' : 'core');
   const P = useMemo(() => buildPlan({
@@ -524,21 +564,35 @@ function Today({ s, set, setS, sync, eng }) {
     urgent: s.urgent || {}, plan: s.plan, neglectDays: s.neglect,
     goalMin: { ga: s.tGA || 60, ma: s.tMA || 60, core: s.tCORE || 180 }, pyq: { count: pyqCount, goal: s.pyqGoal || 10 },
   }), [today, Math.floor(todaySec / 60), R, s.subjects, s.tests, s.mocks, s.revq, s.log, s.plan, s.sched, s.targetDate, s.examDate, s.goalH, s.urgent, s.neglect, s.tGA, s.tMA, s.tCORE, s.pyqGoal, pyqCount]);
+  return { today, logToday, todaySec, pyqCount, P };
+}
 
+function Today({ s, set, eng, D }) {
+  const { today, todaySec, pyqCount, P } = D;
+  const pyq = { count: pyqCount, dec: () => set('rules', (r) => ({ ...r, [today]: { ...r[today], pyqCount: Math.max(0, pyqCount - 1) } })), inc: () => set('rules', (r) => ({ ...r, [today]: { ...r[today], pyqCount: pyqCount + 1 } })) };
   return (<>
-    <div className="card">
+    <Hideable id="timer"><TimerCard s={s} set={set} eng={eng} rows={ROWS} todaySec={todaySec} /></Hideable>
+    <Verdict P={P} s={s} set={set} />
+    <Hideable id="calc"><PaceCalc P={P} s={s} set={set} today={today} /></Hideable>
+    <TodayList P={P} s={s} set={set} pyq={pyq} />
+    <Hideable id="deadline"><div className="card">
       <div className="row sb" style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}><div style={{ minWidth: 0 }}><div className="num">{daysTo(s.targetDate)}</div><div className="mute small" style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>days to syllabus completion · <InlineDate value={s.targetDate} onChange={(v) => set('targetDate', v)} fmt={sdy} /></div></div>
-        <div style={{ textAlign: 'right' }}><div className="num" style={{ color: 'var(--amber)' }}>{R.marks.toFixed(0)}<span className="mute small"> / {s.target}</span></div><div className="mute small">syllabus-implied marks vs target</div></div></div>
+        </div>
       <div className="row sb small mute" style={{ marginTop: 10, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
         <span>GATE exam · <InlineDate value={s.examDate} onChange={(v) => set('examDate', v)} fmt={sdy} /></span>
         <span>{daysTo(s.examDate)}d left</span>
       </div>
-    </div>
+    </div></Hideable>
+  </>);
+}
 
-    <TimerCard s={s} set={set} eng={eng} rows={ROWS} todaySec={sum(logToday)} />
-
-    <PlanView P={P} s={s} set={set} />
-
+/* daily rules: minutes per block, PYQ target, last 7 days (moved off Today; everything editable) */
+function DailyRules({ s, set, D }) {
+  const { today, logToday, todaySec, pyqCount } = D, goal = s.goalH * 3600;
+  const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); const k = dkey(d); return [k, k === today ? todaySec : sum(s.log[k])]; });
+  let streak = 0;
+  for (let i = 0; i < 400; i++) { const d = new Date(); d.setDate(d.getDate() - i); const k = dkey(d); const v = k === today ? todaySec : sum(s.log[k]); if (v >= 1800) streak++; else if (i > 0) break; }
+  return (<>
     <div className="card">
       <div className="row sb"><h3>Time and PYQs today</h3><span className="mute small">goal <Inline min={1} max={16} value={s.goalH} onValue={(v) => set('goalH', v)} /> h · streak {streak}d</span></div>
       {[['ga', 'General Aptitude', 'tGA', 60], ['ma', 'Engineering Maths', 'tMA', 60], ['core', 'Core subjects', 'tCORE', 180]].map(([g, label, key, def]) => {
@@ -559,149 +613,68 @@ function Today({ s, set, setS, sync, eng }) {
       </div>
       <div className="mute small" style={{ marginTop: 4 }}>Week {hrs(days.reduce((a, d) => a + d[1], 0))} h · bars turn green at your daily goal</div>
     </div>
-
-
   </>);
 }
 
-/* ───────── Import from PW Extension ───────── */
+function PlanTab({ s, set, D }) {
+  return <><Hideable id="rules"><DailyRules s={s} set={set} D={D} /></Hideable><Hideable id="outlook"><PlanOutlook P={D.P} /></Hideable><Hideable id="schedule"><Plan s={s} set={set} /></Hideable></>;
+}
+
+/* ───────── Import PW sync file (pw-sync-latest.json) ───────── */
 function ImportFromPW({ s, setS }) {
-  const [phase, setPhase] = useState('idle'); // idle | preview | done
-  const [preview, setPreview] = useState(null);
+  const [snap, setSnap] = useState(null);
+  const [res, setRes] = useState(null);   // dry-run result
   const [err, setErr] = useState('');
-  const [inclTicks, setInclTicks] = useState(true);
-  const [inclTests, setInclTests] = useState(true);
-  const [dropping, setDropping] = useState(false);
+  const [done, setDone] = useState(false);
+  const [drop, setDrop] = useState(false);
+  const last = s.pwSync;
 
-  const readFiles = async (fileList) => {
-    setErr(''); setPhase('idle');
-    const loaded = [];
-    for (const f of fileList) {
-      if (!f.name.endsWith('.json')) continue;
-      try { loaded.push({ name: f.name, text: await f.text() }); } catch {}
-    }
-    if (!loaded.length) { setErr('No .json files found. Drop your PW-GATE/data/ folder contents here.'); return; }
+  const read = async (f) => {
+    setErr(''); setDone(false); setSnap(null); setRes(null);
+    if (!f) return;
     try {
-      const p = parsePWFiles(loaded, s.subjects, s.tests || []);
-      setPreview(p);
-      setPhase(p.hasData ? 'preview' : 'empty');
-    } catch (e) { setErr('Could not read files: ' + e.message); }
+      const o = JSON.parse(await f.text());
+      if (!isPwSync(o)) { setErr('Not a PW sync file (expected kind "pw-sync"). Use pw-sync-latest.json from Downloads\\GCC.'); return; }
+      setSnap(o); setRes(applyPwSync(s, o));
+    } catch (e) { setErr('Could not read file: ' + e.message); }
   };
-
-  const onDrop = (e) => {
-    e.preventDefault(); setDropping(false);
-    const items = [...(e.dataTransfer.items || [])];
-    const files = items.length
-      ? items.filter((i) => i.kind === 'file').map((i) => i.getAsFile()).filter(Boolean)
-      : [...e.dataTransfer.files];
-    readFiles(files);
-  };
-
   const apply = () => {
-    const { subjects, tests } = applyPWImport(preview, s.subjects, s.tests || [], { includeTicks: inclTicks, includeTests: inclTests });
-    setS((p) => ({ ...p, subjects, tests }));
-    setPhase('done');
+    setS((p) => { const r = applyPwSync(p, snap); return { ...p, subjects: r.subjects, tests: r.tests, mocks: r.mocks, pwSync: r.pwSync }; });
+    setDone(true); setSnap(null);
   };
-
-  const reset = () => { setPhase('idle'); setPreview(null); setErr(''); };
-
-  const zone = {
-    border: `2px dashed ${dropping ? 'var(--amber)' : 'var(--line)'}`,
-    borderRadius: 10, padding: '22px 14px', textAlign: 'center', cursor: 'pointer',
-    background: dropping ? 'color-mix(in srgb,var(--amber) 8%,transparent)' : 'transparent',
-    transition: 'all .15s',
-  };
+  const R = res?.report;
+  const zone = { border: `2px dashed ${drop ? 'var(--amber)' : 'var(--line)'}`, borderRadius: 10, padding: '16px 14px', textAlign: 'center', background: drop ? 'color-mix(in srgb,var(--amber) 8%,transparent)' : 'transparent' };
 
   return (
     <div className="card">
-      <h3 style={{ margin: '0 0 4px' }}>Import from PW extension</h3>
+      <h3 style={{ margin: '0 0 4px' }}>PW sync</h3>
       <div className="small mute" style={{ marginBottom: 10 }}>
-        Drop your <code>PW-GATE/data/</code> folder files (or pick them) to tick completed lectures and sync your test list.
-        Ticks already in the app are never removed.
+        {last?.updated ? <>Last synced {new Date(last.updated).toLocaleString('en-IN')} · {last.totals?.done ?? 0}/{last.totals?.lectures ?? 0} lectures done · {last.attempted ?? 0} of {last.testCount ?? 0} tests attempted.</> : 'Not synced yet.'}{' '}
+        Ticks are only added, never removed.{window.gcc?.pwLatest ? ' Windows app auto-imports Downloads\\GCC\\pw-sync-latest.json; the button below is the fallback.' : ''}
       </div>
-
-      {phase === 'idle' && <>
-        <div style={zone}
-          onDragOver={(e) => { e.preventDefault(); setDropping(true); }}
-          onDragLeave={() => setDropping(false)}
-          onDrop={onDrop}>
-          <div style={{ fontSize: 28, marginBottom: 6 }}>📂</div>
-          <div className="mute small">Drop <b>data/</b> folder files here</div>
-          <div className="mute small" style={{ marginTop: 4 }}>or</div>
-          <label className="btn ghost" style={{ marginTop: 8, display: 'inline-block', cursor: 'pointer' }}>
-            Pick files
-            <input type="file" accept=".json" multiple hidden onChange={(e) => readFiles([...e.target.files])} />
-          </label>
+      {!snap && <div style={zone} onDragOver={(e) => { e.preventDefault(); setDrop(true); }} onDragLeave={() => setDrop(false)} onDrop={(e) => { e.preventDefault(); setDrop(false); read(e.dataTransfer.files[0]); }}>
+        <div className="mute small">Drop <code>pw-sync-latest.json</code> here</div>
+        <label className="btn ghost" style={{ marginTop: 8, display: 'inline-block', cursor: 'pointer' }}>Pick file<input type="file" accept=".json" hidden onChange={(e) => read(e.target.files[0])} /></label>
+      </div>}
+      {err && <div className="small" style={{ color: 'var(--red)', marginTop: 8 }}>{err}</div>}
+      {done && <div className="small" style={{ color: 'var(--green)', marginTop: 8 }}>Applied. Other devices pick it up via sync.</div>}
+      {snap && R && <>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          <span className="tag live">+{R.ticked} lectures to tick</span>
+          <span className="tag">{R.newTests} new tests</span>
+          <span className="tag">{R.updatedTests} tests updated</span>
+          <span className="tag">{R.newResults} new results</span>
+          {R.updatedResults > 0 && <span className="tag">{R.updatedResults} results updated</span>}
         </div>
-        {err && <div className="small" style={{ color: 'var(--red)', marginTop: 8 }}>{err}</div>}
-        <div className="small mute" style={{ marginTop: 8 }}>
-          Files: <code>index.json</code>, <code>dashboard.json</code>, <code>tests-batch.json</code>, <code>tests-series.json</code>, and any <code>chapters/*.json</code>
-        </div>
-      </>}
-
-      {phase === 'empty' && <>
-        <div className="small" style={{ color: 'var(--amber)', margin: '8px 0' }}>
-          Files read ({preview?.chaptersRead} chapter{preview?.chaptersRead !== 1 ? 's' : ''}, dashboard {preview?.dashboard ? '✓' : '–'}) but nothing new to apply —
-          all lectures are already ticked or no done status found.
-        </div>
-        <button className="btn ghost" onClick={reset}>Try again</button>
-      </>}
-
-      {phase === 'preview' && preview && <>
-        {/* Summary chips */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-          {preview.dashboard && <span className="tag">Dashboard {preview.dashboard.date}</span>}
-          <span className="tag">{preview.chaptersRead} chapter file{preview.chaptersRead !== 1 ? 's' : ''}</span>
-          {preview.totalToTick > 0 && <span className="tag live">+{preview.totalToTick} lecture{preview.totalToTick !== 1 ? 's' : ''} to tick</span>}
-          {preview.newTestCount > 0 && <span className="tag">+{preview.newTestCount} new tests</span>}
-          {preview.updTestCount > 0 && <span className="tag">{preview.updTestCount} tests update</span>}
-        </div>
-
-        {/* Tick preview */}
-        {preview.deltas.length > 0 && <>
-          <div className="small mute" style={{ marginBottom: 4 }}>Lectures to tick (PW says done; already-ticked are skipped)</div>
-          <div className="card" style={{ padding: '4px 12px', marginBottom: 10, maxHeight: 200, overflowY: 'auto' }}>
-            {preview.deltas.map((d, i) => (
-              <div key={i} style={{ display: 'flex', gap: 10, padding: '5px 0', borderTop: i ? '1px solid var(--line)' : 'none', alignItems: 'center' }}>
-                <span style={{ flex: 1 }}>
-                  <b>{d.subjectName}</b>
-                  <span className="mute"> · {d.chapterName}</span>
-                </span>
-                <span className="tag live">+{d.toTick}</span>
-              </div>
-            ))}
-          </div>
-        </>}
-
-        {/* What to apply */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-          {preview.totalToTick > 0 && (
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
-              <input type="checkbox" checked={inclTicks} onChange={(e) => setInclTicks(e.target.checked)} style={{ accentColor: 'var(--amber)' }} />
-              <span>Tick {preview.totalToTick} lecture{preview.totalToTick !== 1 ? 's' : ''}</span>
-            </label>
-          )}
-          {preview.allTests.length > 0 && (
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
-              <input type="checkbox" checked={inclTests} onChange={(e) => setInclTests(e.target.checked)} style={{ accentColor: 'var(--amber)' }} />
-              <span>Merge {preview.allTests.length} tests ({preview.newTestCount} new, {preview.updTestCount} updates)</span>
-            </label>
-          )}
-        </div>
-
+        {R.unmatched.length > 0 && <div className="small" style={{ color: 'var(--amber)', marginBottom: 6 }}>Unmatched subjects: {R.unmatched.join(', ')}</div>}
+        {R.mismatch.length > 0 && <details className="small mute" style={{ marginBottom: 10 }}>
+          <summary>{R.mismatch.length} chapter{R.mismatch.length !== 1 ? 's' : ''} differ from PW (only the overlapping lectures are matched)</summary>
+          {R.mismatch.map((m, i) => <div key={i}>{m}</div>)}
+        </details>}
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn pri" onClick={apply}
-            disabled={!(inclTicks && preview.totalToTick > 0) && !(inclTests && preview.allTests.length > 0)}>
-            Apply
-          </button>
-          <button className="btn ghost" onClick={reset}>Cancel</button>
+          <button className="btn pri" onClick={apply}>Apply</button>
+          <button className="btn ghost" onClick={() => { setSnap(null); setRes(null); }}>Cancel</button>
         </div>
-        <div className="small mute" style={{ marginTop: 8 }}>PW can lag up to 24 h. Lectures you already ticked are never removed.</div>
-      </>}
-
-      {phase === 'done' && <>
-        <div style={{ color: 'var(--ok)', marginBottom: 8 }}>✓ Applied. Sync will push changes to your other devices.</div>
-        <button className="btn ghost" onClick={reset}>Import again</button>
       </>}
     </div>
   );
@@ -768,6 +741,7 @@ function Syllabus({ s, set }) {
               <span style={{ flex: 1, fontWeight: 600 }}>{sub.name}</span>
               {!sub.row && <span className="tag" style={{ color: 'var(--red)' }}>NOT COUNTED</span>}
               <span className={`tag ${sub.type !== 'rec' ? 'live' : ''}`}>{catLabel(sub.type)}</span>
+              {subjectStats(sub).partial > 0 && <span className="tag">{subjectStats(sub).partial} partial</span>}
               <span className="mute small" style={{ width: 54, textAlign: 'right' }}>{d}/{all.length}</span>
               <span style={{ width: 70 }}><Bar v={all.length ? d / all.length : 0} c={all.length && d === all.length ? 'g' : ''} /></span>
             </summary>
@@ -794,7 +768,7 @@ function Syllabus({ s, set }) {
                       <button className="btn ghost" style={{ padding: '2px 9px' }} onClick={() => { if (confirm(`Delete chapter "${c.name}"?`)) upd(sub.id, (x) => ({ ...x, chapters: x.chapters.filter((_, i) => i !== ci) })); }}>×</button>
                     </div>
                   ) : (
-                    <div className="row sb"><span style={{ fontWeight: 600 }}>{c.name}</span>
+                    <div className="row sb"><span style={{ fontWeight: 600 }}>{c.name}<span className="mute small" style={{ fontWeight: 400, marginLeft: 8 }}>{(() => { const st = chapterStats(c); return [`${st.done}/${st.total}`, st.partial ? `${st.partial} partial` : '', st.dpps ? `${st.dpps} DPP` : '', st.live ? `${st.live} live` : '', fmtLeft(st)].filter(Boolean).join(' · '); })()}</span></span>
                       <button className="btn ghost" style={{ padding: '2px 10px', fontSize: 12 }} onClick={() => updCh(sub.id, ci, (x) => ({ ...x, lectures: x.lectures.map((l) => ({ ...l, done: cd !== x.lectures.length })) }))}>{c.lectures.length && cd === c.lectures.length ? 'Clear' : 'All done'}</button></div>
                   )}
                   {edit ? c.lectures.map((l, li) => (
@@ -810,6 +784,7 @@ function Syllabus({ s, set }) {
                           <label style={{ display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={!!l.done} onChange={() => updLec(sub.id, ci, li, { done: !l.done })} />{l.name}</label>
                           {l.date && l.date !== '—' && l.date !== '-' ? <span className="dim small">{l.date}</span> : null}
                           {l.dpp ? <span className="tag dpp">{l.dpp}</span> : null}
+                          {!l.done && l.pw === 'partial' ? <span className="tag" style={{ color: 'var(--amber)' }}>partial</span> : null}
                           <label className="tag" style={{ display: 'flex', gap: 3, alignItems: 'center', cursor: 'pointer', color: l.pyq ? 'var(--blue)' : 'var(--dim)' }}><input type="checkbox" checked={!!l.pyq} onChange={() => updLec(sub.id, ci, li, { pyq: !l.pyq })} /> PYQ</label>
                         </span>))}
                     </div>
@@ -826,56 +801,13 @@ function Syllabus({ s, set }) {
   </>);
 }
 
-/* ───────── Readiness: weighted by marks map ───────── */
-function Ready({ s, set }) {
-  const R = useMemo(() => readiness(s), [s.subjects, s.mocks, s.marks, s.weights, s.log, s.sched]);
-  const gap = [...R.rows].map((r) => ({ ...r, left: r.marks * (1 - r.score) * (100 / R.total) })).sort((a, b) => (b.urgent - a.urgent) || (b.left - a.left));
-  const unmapped = s.subjects.filter((x) => !ROWS.some((r) => r.id === x.row));
-  const stat = (label, v, sub) => (<div><div className="row sb small mute"><span>{label}</span><span>{Math.round(v * 100)}%</span></div><Bar v={v} /><div className="dim small">{sub}</div></div>);
-  return (<>
-    <div className="card">
-      <div className="row sb">
-        <div><div className="num" style={{ fontSize: 46, color: 'var(--amber)' }}>{(R.pct * 100).toFixed(1)}%</div><div className="mute small">weighted exam readiness</div></div>
-        <div style={{ textAlign: 'right' }}><div className="num">{R.marks.toFixed(0)}<span className="mute small"> marks</span></div>
-          <div className="mute small">target <Inline min={30} max={100} value={s.target} onValue={(v) => set('target', v)} /></div></div>
-      </div>
-      <div style={{ marginTop: 10 }}><Bar v={R.marks / s.target} c={R.marks >= s.target ? 'g' : ''} /></div>
-      <div className="small mute" style={{ marginTop: 8 }}>Coverage comes from lectures ticked done, PYQ from lectures ticked PYQ-attempted, and mock accuracy from subject-wise mock scores you log in Tests — nothing here is typed in by hand. Each is weighted then scaled by exam marks.</div>
-    </div>
-
-    {unmapped.length > 0 && <div className="card"><h3 style={{ color: 'var(--red)' }}>Not counted toward readiness</h3><div className="small mute">{unmapped.map((x) => x.name).join(', ')}. Open the subject in Syllabus and pick "Counts toward".</div></div>}
-
-    <div className="card">
-      <h3>Biggest marks still on the table</h3>
-      {gap.slice(0, 4).map((r) => <div key={r.id} className="row sb small" style={{ padding: '3px 0' }}><span>{r.name} <span className="tag" style={{ color: TIER_COLOR[r.tier] }}>{r.tier}</span></span><span className="mute">{r.left.toFixed(1)} marks</span></div>)}
-    </div>
-
-    {sortReadyRows(R.rows).map((r, ri, rarr) => (
-      <React.Fragment key={r.id}>
-      <GroupHead prev={rarr[ri - 1]} cur={r} ready />
-      <details className="card" style={{ padding: '10px 14px' }}>
-        <summary style={{ listStyle: 'none', cursor: 'pointer' }}>
-          <div className="row sb" style={{ flexWrap: 'nowrap' }}><b style={{ minWidth: 0 }}>{r.name} <span className="tag" style={{ color: TIER_COLOR[r.tier] }}>{r.tier}</span></b><span className="small" style={{ whiteSpace: 'nowrap', color: r.urgent ? 'var(--red)' : r.label === 'Strong' ? 'var(--green)' : r.label === 'Weak' ? 'var(--red)' : 'var(--amber)' }}>{r.urgent ? 'URGENT · ' : ''}{r.label} · {(r.score * 100).toFixed(0)}%</span></div>
-          <div style={{ marginTop: 6 }}><Bar v={r.score} c={r.score >= 0.7 ? 'g' : ''} /></div>
-        </summary>
-        <div className="small mute" style={{ margin: '8px 0 2px' }}>{r.d}/{r.t} lectures · {r.label === 'Strong' ? 'maintenance: only touch in full mocks' : r.label === 'Medium' ? 'focus on weak chapters and PYQ gaps' : 'needs foundation revision and topic tests'}</div>
-        <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center', margin: '6px 0' }}><input type="checkbox" checked={r.urgent} onChange={(e) => set('urgent', (u) => ({ ...(u || {}), [r.id]: e.target.checked }))} /> Mark urgent (the planner puts it first)</label>
-        <div className="row sb small mute" style={{ margin: '8px 0' }}><span>Exam marks for this subject</span><Inline min={0} max={30} value={r.marks} onValue={(v) => set('marks', (m) => ({ ...m, [r.id]: v }))} /></div>
-        <div className="grid" style={{ gap: 14 }}>
-          {stat('PYQ attempted', r.pyq, `${r.pq}/${r.t} lectures`)}
-          {r.rev == null ? <div><div className="row sb small mute"><span>Test score</span><span>no data</span></div><div className="dim small">no subject test yet, so its weight is dropped and nothing is penalised</div></div> : stat('Test score', r.rev, `${r.mockN} subject test${r.mockN > 1 ? 's' : ''}, pulled toward ${s.tPrior ?? 50}% until history builds`)}
-        </div>
-      </details>
-      </React.Fragment>))}
-
-  </>);
-}
-
 /* ───────── Mocks: log, diagnostics, editable test series ───────── */
 function Mocks({ s, set }) {
   const blank = { test: 'custom', name: '', date: dkey(), score: '', max: 100, concept: '', calc: '', time: '', silly: '', subj: {} };
   const [f, setF] = useState(blank), [msg, setMsg] = useState('');
+  const [kf, setKf] = useState('all'), [sf, setSf] = useState('all'), [showAll, setShowAll] = useState(false);
   const tests = s.tests;
+  const updMock = (id, patch) => set('mocks', (a) => a.map((m) => (m.id === id ? { ...m, ...patch } : m)));
   const pick = (id) => { const t = tests.find((x) => x.id === id); setF({ ...f, test: id, name: t ? t.name : '', max: t ? t.marks : 100, date: t?.date || f.date }); };
   const add = () => {
     const score = parseFloat(f.score), max = parseFloat(f.max) || 100;
@@ -965,10 +897,25 @@ function Mocks({ s, set }) {
       <div className="card">
         <h3>History</h3>
         <table><thead><tr><th>Test</th><th>Score</th><th>/100</th><th /></tr></thead><tbody>
-          {[...M].reverse().map((m) => <tr key={m.id}><td>{m.name}<div className="dim small">{m.date}</div></td><td>{m.score}/{m.max}</td><td>{norm(m).toFixed(0)}</td><td><button className="btn ghost" style={{ padding: '1px 8px' }} onClick={() => set('mocks', (a) => a.filter((x) => x.id !== m.id))}>×</button></td></tr>)}
+          {[...M].reverse().map((m) => <tr key={m.id}><td>{m.name}<div className="dim small">{m.date}{m.pwResultId ? ' · from PW' : ''}</div><details className="small"><summary className="mute">Tag lost marks{CATS.some(([c]) => m[c]) ? ` (${CATS.reduce((a, [c]) => a + (m[c] || 0), 0)})` : ''}</summary><div className="row" style={{ margin: '4px 0' }}>{CATS.map(([c, l]) => <label key={c} className="small mute">{l}<br /><Num min={0} max={m.max} value={m[c] || 0} onValue={(v) => updMock(m.id, { [c]: v })} /></label>)}</div></details></td><td>{m.score}/{m.max}</td><td>{norm(m).toFixed(0)}</td><td><button className="btn ghost" style={{ padding: '1px 8px' }} onClick={() => set('mocks', (a) => a.filter((x) => x.id !== m.id))}>×</button></td></tr>)}
         </tbody></table>
       </div>
     </>}
+
+    <div className="card">
+      <div className="row sb"><h3 style={{ margin: 0 }}>All tests</h3><span className="mute small">{(() => { const c = countBy(tests, M, today); return `${c.attempted} attempted · ${c.missed} missed · ${c.upcoming} upcoming`; })()}</span></div>
+      <div className="row" style={{ margin: '8px 0 4px' }}>{[['all', 'All kinds'], ...KINDS].map(([k, l]) => <button key={k} className={`btn sm ${kf === k ? '' : 'ghost'}`} onClick={() => { setKf(k); setShowAll(false); }}>{l}</button>)}</div>
+      <div className="row" style={{ marginBottom: 8 }}>{[['all', 'Any status'], ...STATUSES].map(([k, l]) => <button key={k} className={`btn sm ${sf === k ? '' : 'ghost'}`} onClick={() => { setSf(k); setShowAll(false); }}>{l}</button>)}</div>
+      {(() => {
+        const rows = filterTests(tests, M, today, { kind: kf, status: sf }), shown = showAll ? rows : rows.slice(0, 40), col = { attempted: 'var(--green)', missed: 'var(--red)', upcoming: 'var(--mute)' };
+        return <>{shown.map(({ t, status, res }) => <div key={t.id} className="row sb small" style={{ padding: '5px 0', borderTop: '1px solid var(--line)', flexWrap: 'nowrap' }}>
+          <span style={{ minWidth: 0 }}>{t.name}<span className="dim"> · {shortDate(t.date)}{t.marks ? ` · ${t.marks}m` : ''}</span></span>
+          <span style={{ color: col[status], whiteSpace: 'nowrap' }}>{status === 'attempted' && res ? `${res.score}/${res.max}` : status}</span>
+        </div>)}
+        {!rows.length && <div className="mute small">No tests match.</div>}
+        {rows.length > shown.length && <button className="btn ghost sm" style={{ marginTop: 6 }} onClick={() => setShowAll(true)}>Show all {rows.length}</button>}</>;
+      })()}
+    </div>
 
     <div className="card">
       <h3>Test series ({tests.length} tests · {logged.size} logged)</h3>

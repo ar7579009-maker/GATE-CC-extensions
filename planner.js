@@ -66,7 +66,8 @@ export function buildPlan(inp) {
     let left = 0, total = 0, done = 0;
     sub.chapters.forEach((c) => c.lectures.forEach((l) => { total++; if (l.done) done++; else left += units(l); }));
     const pace = paceOf(keyOf(sub)), row = sub.row ? rowById.get(sub.row) : null;
-    return { sub, row, left, total, done, pace, skipped: !!cfg.skip[sub.id], hours: left * pace.h * (1 + cfg.revPct / 100) };
+    let videoSec = 0; sub.chapters.forEach((c) => c.lectures.forEach((l) => { if (!l.done && l.dur > 0) videoSec += l.dur; }));
+    return { sub, row, left, total, done, pace, videoSec, skipped: false, hours: left * pace.h * (1 + cfg.revPct / 100) };
   });
   const active = subs.filter((x) => !x.skipped);
   const remainingH = active.reduce((a, x) => a + x.hours, 0);
@@ -102,18 +103,10 @@ export function buildPlan(inp) {
   const options = [];
   if (status !== 'green') {
     if (Number.isFinite(need)) options.push({ id: 'raise', kind: 'raise', label: `Study ${hh(need)} h a day${actual7 > 0 ? ` (last 7 days: ${hh(actual7)})` : ''}` });
-    active.filter((x) => x.hours > 0).map((x) => {
-      const same = active.filter((y) => y.sub.row && y.sub.row === x.sub.row), rowLeftU = same.reduce((a, y) => a + y.left, 0) || 1;
-      const marksPct = x.row ? (x.row.marks / totalMarks) * 100 * (x.left / rowLeftU) : 0;   // its share of the marks group, by lectures still to do
-      return { id: 'skip:' + x.sub.id, kind: 'skip', subId: x.sub.id, label: `Skip ${x.sub.name}`, saves: x.hours, marksPct, mph: marksPct / x.hours };
-    }).sort((p, q) => p.mph - q.mph || q.saves - p.saves).slice(0, 3).forEach((o) => options.push(o));
-    const cap = Math.max(0.5, goalH) * (1 - cfg.bufferPct / 100);
-    let d = inp.targetDate, i = 0; while (i++ < 800 && workDays(today, d, cfg.restDay) * cap < remainingH) d = addDays(d, 7);
-    if (i < 800) options.push({ id: 'move', kind: 'move', label: `Move the target date to ${d}`, date: d });
   }
   const horizon = {
-    targetDate: inp.targetDate, daysLeft: Math.max(0, diffDays(inp.targetDate, today)), workDays: wd, remainingLectures: remainingU,
-    remainingHours: hh(remainingH), needPerDay: Number.isFinite(need) ? hh(need) : null, actual7: hh(actual7), goalH, gap: Number.isFinite(need) ? hh(need - actual7) : null,
+    targetDate: inp.targetDate, daysLeft: Math.max(0, diffDays(inp.targetDate, today)), workDays: wd, bufferPct: cfg.bufferPct, restDay: cfg.restDay, remainingLectures: remainingU,
+    remainingHours: hh(remainingH), videoHours: hh(active.reduce((a, x) => a + x.videoSec, 0) / 3600), needPerDay: Number.isFinite(need) ? hh(need) : null, actual7: hh(actual7), goalH, gap: Number.isFinite(need) ? hh(need - actual7) : null,
     status, missedLive: missedAll.length, options, pace: [...new Set(active.filter((x) => x.left > 0).map((x) => keyOf(x.sub)))].filter((k) => paceOf(k).measured).length,
   };
 
@@ -199,4 +192,42 @@ export function buildPlan(inp) {
   };
 
   return { today: { items, over, hours: hh(acc), capH: cfg.capH }, doNow, week: { from: w0, to: w1, items: week, hours: weekHours }, month: { from: m0, to: m1, items: month, hours: monthHours }, horizon, exam };
+}
+
+
+/* ── per-subject mastery (feeds the Do-now pick): M = Wc*C + Wp*P + Wt*T, all 0-100 ──
+   T = test average shrunk toward a neutral prior; with no subject-wise test yet the test weight is dropped and the rest rescale. */
+export const MASTERY_K = 2;
+export const DEFAULT_PRIOR = 50;
+export const shrink = (n, avg, prior = DEFAULT_PRIOR, k = MASTERY_K) => (n ? (n * avg + k * prior) / (n + k) : null);
+export function weightsFor(w, hasTest) {
+  const wc = +w.cov || 0, wp = +w.pyq || 0, wt = hasTest ? +w.rev || 0 : 0, sum = wc + wp + wt || 1;
+  return { cov: wc / sum, pyq: wp / sum, test: wt / sum };
+}
+export const masteryLabel = (M) => (M >= 85 ? 'Strong' : M >= 50 ? 'Medium' : 'Weak');
+export function mastery({ C, P, tests = [], w, prior = DEFAULT_PRIOR }) {
+  const n = tests.length, avg = n ? tests.reduce((a, b) => a + b, 0) / n : 0, T = shrink(n, avg, prior);
+  const W = weightsFor(w, n > 0);
+  const raw = W.cov * C + W.pyq * P + W.test * (T ?? 0);
+  return { M: raw, raw, C, P, T, n, W, label: masteryLabel(raw) };
+}
+
+
+/* ── pace calculator ──
+   total   = hours left at 1x from buildPlan (lecture video + DPP + notes + revision)
+   video   = the part of that which is lecture video with a known length; only this part speeds up with playback speed.
+   hours(v) = total - video + video / v */
+export function calcPace({ total, video = 0, speed = 1, hPerDay, windowDays, today, targetDate, restDay = -1, bufferPct = 15 }) {
+  const v = Math.max(0.5, +speed || 1), vid = Math.min(Math.max(0, video), Math.max(0, total));
+  const hours = total - vid + vid / v, eff = Math.max(0, hPerDay) * (1 - bufferPct / 100);
+  const wd = Math.max(0, workDays(today, targetDate, restDay));
+  let finish = null;
+  if (hours <= 0) finish = today;
+  else if (eff > 0) { let d = today, i = 0; while (i++ < 4000 && workDays(today, d, restDay) * eff < hours) d = addDays(d, 1); if (i < 4000) finish = d; }
+  const win = Math.max(0, Math.round(windowDays || 0));
+  return {
+    hours: hh(hours), finish, daysEarly: finish ? diffDays(targetDate, finish) : null,
+    windowHours: hh(win > 0 ? workDays(today, addDays(today, win - 1), restDay) * eff : 0),
+    neededPerDay: hours <= 0 ? 0 : wd > 0 ? hh(hours / (wd * (1 - bufferPct / 100))) : null,
+  };
 }

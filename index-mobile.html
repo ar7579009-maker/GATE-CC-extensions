@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://*.supabase.co" />
+<meta name="theme-color" content="#0F0F0E" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<link rel="manifest" href="web/manifest-mobile.webmanifest" />
+<link rel="apple-touch-icon" href="web/apple-touch-icon.png" />
+<title>GATE CC</title>
+<style>
+/* ── tokens ── */
+:root{
+  --bg:#0F0F0E;--panel:#1C1D1B;--panel2:#242522;--line:#3A3936;
+  --ink:#EDEAE2;--mute:#8A8880;--dim:#5A5850;
+  --amber:#D68A2B;--green:#4A7C6C;--red:#A8452F;--blue:#7B8CDE;
+  --display:Bahnschrift,"DIN Alternate","Arial Narrow",sans-serif;
+  --nav-h:62px;
+}
+[data-theme=light]{
+  --bg:#F4F1EA;--panel:#FFF;--panel2:#ECE8DE;--line:#D6D0C2;
+  --ink:#1C1D1B;--mute:#6B685F;--dim:#9A968A;
+  --amber:#B86F14;--green:#3F7A66;--red:#B03A25;--blue:#5468C8;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body,#root{height:100%;margin:0}
+body{
+  background:var(--bg);color:var(--ink);
+  font:15px/1.5 -apple-system,"Segoe UI",system-ui,sans-serif;
+  overflow:hidden;
+}
+::-webkit-scrollbar{display:none}
+
+/* ── shell ── */
+.shell{
+  display:flex;flex-direction:column;
+  height:100%;
+  padding-top:env(safe-area-inset-top,0px);
+}
+
+/* top header bar */
+.topbar{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 16px 8px;
+  background:var(--panel);
+  border-bottom:1px solid var(--line);
+  flex-shrink:0;
+}
+.topbar-title{font:700 14px var(--display);letter-spacing:.06em;color:var(--amber);flex:1}
+.topbar-right{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--mute)}
+
+/* scrollable content */
+.content{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 14px 8px;-webkit-overflow-scrolling:touch}
+
+/* bottom nav */
+.botnav{
+  display:flex;
+  background:var(--panel);
+  border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  flex-shrink:0;
+}
+.botnav button{
+  flex:1;background:none;border:0;color:var(--mute);
+  padding:10px 4px 8px;
+  font:600 10px var(--display);letter-spacing:.04em;
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;
+}
+.botnav button .ico{font-size:20px;line-height:1}
+.botnav button.on{color:var(--amber)}
+.botnav button.on .ico-bar{
+  width:20px;height:2px;background:var(--amber);border-radius:1px;
+  display:block;margin:0 auto -5px;
+}
+
+/* ── cards ── */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+
+/* ── Today: hero stat row ── */
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.hero-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-align:center}
+.hero-num{font:700 28px/1 var(--display);font-variant-numeric:tabular-nums}
+.hero-label{font-size:11px;color:var(--mute);margin-top:3px}
+
+/* ── Timer: big touch target ── */
+.timer-block{text-align:center;padding:8px 0 14px}
+.timer-big{font:700 56px/1 var(--display);font-variant-numeric:tabular-nums;color:var(--amber);letter-spacing:.02em}
+.timer-sub{font-size:12px;color:var(--mute);margin-top:4px}
+.timer-btns{display:flex;gap:10px;justify-content:center;margin-top:16px}
+.tbtn{
+  min-width:72px;padding:14px 0;border-radius:12px;
+  border:0;font:700 14px var(--display);cursor:pointer;
+  background:var(--amber);color:#1C1D1B;
+}
+.tbtn.ghost{background:var(--panel2);color:var(--ink)}
+.tbtn.stop{background:var(--red);color:var(--ink)}
+
+/* subject chips for timer */
+.sub-chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:14px}
+.sub-chip{
+  background:var(--panel2);border:1px solid var(--line);border-radius:20px;
+  padding:6px 12px;font:600 12px var(--display);color:var(--mute);cursor:pointer;
+}
+.sub-chip.on{background:color-mix(in srgb,var(--amber) 18%,transparent);border-color:var(--amber);color:var(--amber)}
+
+/* daily rings row */
+.rings{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;scrollbar-width:none}
+.ring-item{flex-shrink:0;text-align:center;width:64px}
+.ring-item svg{width:56px;height:56px;transform:rotate(-90deg)}
+.ring-label{font-size:10px;color:var(--mute);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ring-val{font:600 11px var(--display);color:var(--ink);text-align:center;margin-top:1px}
+
+/* plan task list */
+.task{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 0;border-top:1px solid var(--line);
+  cursor:pointer;
+}
+.task:first-child{border-top:0}
+.task-dot{width:8px;height:8px;border-radius:50%;background:var(--c,var(--amber));flex-shrink:0}
+.task-name{flex:1;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.task-right{font-size:12px;color:var(--mute);white-space:nowrap}
+.task-pill{font:600 10px var(--display);padding:2px 7px;border-radius:8px;background:var(--panel2);color:var(--c,var(--mute))}
+
+/* readiness big number */
+.ready-hero{text-align:center;padding:10px 0 16px}
+.ready-pct{font:700 64px/1 var(--display);font-variant-numeric:tabular-nums;color:var(--amber)}
+.ready-sub{font-size:12px;color:var(--mute);margin-top:4px}
+
+/* subject progress rows */
+.sub-row{padding:10px 0;border-top:1px solid var(--line)}
+.sub-row:first-child{border-top:0}
+.sub-name{font-weight:600;margin-bottom:5px;display:flex;justify-content:space-between;font-size:14px}
+.bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--amber);border-radius:3px}
+.bar.g>i{background:var(--green)}
+
+/* ticks in syllabus */
+.lec-touch{
+  display:flex;gap:12px;align-items:center;
+  padding:11px 0;border-top:1px solid var(--line);
+  cursor:pointer;
+}
+.lec-touch:first-child{border-top:0}
+.lec-check{
+  width:24px;height:24px;border-radius:6px;border:2px solid var(--line);
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font-size:14px;transition:all .1s;
+}
+.lec-check.done{background:var(--amber);border-color:var(--amber);color:#1C1D1B}
+.lec-name{flex:1;font-size:14px;color:var(--mute)}
+.lec-name.done{color:var(--ink)}
+
+/* test rows */
+.test-row{padding:11px 0;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+.test-row:first-child{border-top:0}
+.test-name{flex:1;font-weight:600;font-size:14px;min-width:0}
+.test-meta{font-size:12px;color:var(--mute)}
+.test-score{font:700 16px var(--display);color:var(--amber)}
+
+/* settings rows */
+.set-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.set-row:first-child{border-top:0}
+.set-label{font-size:14px;font-weight:600}
+.set-sub{font-size:12px;color:var(--mute);margin-top:2px}
+
+/* floating timer pill (timer running, on other tabs) */
+.float-timer{
+  position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 10px);
+  right:14px;z-index:20;
+  background:var(--amber);color:#1C1D1B;
+  border-radius:20px;padding:7px 14px;
+  font:700 14px var(--display);font-variant-numeric:tabular-nums;
+  cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,.4);
+  display:none;
+}
+
+/* PYQ counter big touch */
+.pyq-row{display:flex;align-items:center;gap:16px;justify-content:center;margin:12px 0}
+.pyq-btn{
+  width:48px;height:48px;border-radius:50%;border:0;
+  background:var(--panel2);color:var(--ink);
+  font:700 24px var(--display);cursor:pointer;
+}
+.pyq-num{font:700 36px/1 var(--display);font-variant-numeric:tabular-nums;min-width:48px;text-align:center}
+
+/* week bar mini */
+.week-bars{display:flex;gap:4px;align-items:flex-end;height:44px}
+.week-bar{flex:1;border-radius:3px 3px 0 0;min-height:3px}
+.week-day{font-size:9px;color:var(--mute);text-align:center;margin-top:3px}
+
+/* typography */
+h2{margin:0 0 12px;font:700 17px var(--display);letter-spacing:.03em}
+h3{margin:0 0 6px;font:600 14px var(--display)}
+.mute{color:var(--mute)}.small{font-size:12px}
+.tag{font:600 10px var(--display);padding:1px 6px;border-radius:3px;background:var(--panel2);color:var(--mute)}
+.tag.live{color:var(--amber)}.tag.ok{color:var(--green)}.tag.bad{color:var(--red)}
+
+/* ── added in v10.2: classes the bundle uses (copied from index.html) ── */
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.timer{font:700 56px/1 var(--display);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.num{font:700 30px/1 var(--display);font-variant-numeric:tabular-nums}
+.dim{color:var(--dim)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sb{justify-content:space-between}
+select,input[type=text],input[type=number],input[type=date],input[type=time]{color-scheme:dark;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:7px 9px;font:inherit;max-width:100%}
+input[type=number]{width:74px}
+input[type=range]{accent-color:var(--amber);width:100%}
+input[type=checkbox]{accent-color:var(--amber);width:16px;height:16px;cursor:pointer}
+.btn{background:var(--amber);color:#1C1D1B;border:0;border-radius:6px;padding:9px 18px;font:700 14px var(--display);cursor:pointer}
+.btn.stop{background:var(--red);color:var(--ink)}
+.btn.ghost{background:none;color:var(--mute);border:1px solid var(--line)}
+details.sub{border-top:1px solid var(--line)}
+details.sub>summary{cursor:pointer;padding:9px 0;display:flex;gap:10px;align-items:center;list-style:none}
+details.sub>summary::-webkit-details-marker{display:none}
+.chapter{margin:0 0 10px 6px;padding-left:10px;border-left:2px solid var(--line)}
+.lec{display:flex;gap:6px;align-items:center;padding:3px 10px 3px 0;font-size:13px;color:var(--mute);cursor:pointer;user-select:none}
+.lec.done{color:var(--ink)}
+.lecs{display:flex;flex-wrap:wrap;gap:2px 6px;margin-top:4px}
+.tag.dpp{color:var(--blue)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+td,th{padding:7px 6px;border-top:1px solid var(--line);text-align:left;font-size:13px}
+.pill{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:var(--panel2)}
+[data-theme=light] select,[data-theme=light] input{color-scheme:light}
+.track{position:relative;height:14px;background:var(--panel2);border-radius:7px;flex:1;min-width:60px}
+.seg,.fill{position:absolute;top:0;bottom:0;border-radius:7px}
+.seg{opacity:.3}
+.today{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+/* Plan tab (compact grouped cards) */
+.pl-pw{position:relative;margin:10px 0 4px}
+.pl-phases{display:flex;height:20px;border-radius:4px;overflow:hidden;font:600 10px var(--display);letter-spacing:.06em}
+.pl-phases>div{display:flex;align-items:center;justify-content:center;color:var(--ink);overflow:hidden}
+.pl-ptick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.pl-gh{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;border-top:1px solid var(--line);color:var(--ink);padding:10px 0 8px;cursor:pointer;font:600 13px var(--display);letter-spacing:.04em;text-align:left}
+.pl-gh .chev{display:inline-block;width:12px;color:var(--mute);transition:transform .15s}
+.pl-gh[aria-expanded=true] .chev{transform:rotate(90deg)}
+.pl-gh .cnt{background:var(--panel2);border-radius:10px;padding:0 8px;font-size:11px;color:var(--mute)}
+.pl-gh .gm{margin-left:auto;font:400 12px "Segoe UI",sans-serif;color:var(--mute);letter-spacing:0}
+.pl-card{border-left:3px solid var(--c);background:var(--panel2);border-radius:0 6px 6px 0;margin:0 0 8px;padding:9px 12px}
+.pl-head{cursor:pointer;outline:none}
+.pl-head:focus-visible{box-shadow:0 0 0 2px var(--amber);border-radius:4px}
+.pl-l1{display:flex;align-items:center;gap:8px;min-width:0}
+.pl-nm{font:600 14px var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pl-sp{flex:1}
+.pl-nw{white-space:nowrap}
+.pl-st{color:var(--c);font:600 11px var(--display);letter-spacing:.03em;white-space:nowrap}
+.pl-l3{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.pl-track{position:relative;height:10px;background:var(--panel);border-radius:5px;margin:9px 0 6px}
+.pl-seg,.pl-fill{position:absolute;top:0;bottom:0;border-radius:5px}
+.pl-seg{opacity:.3}
+.pl-today{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.pl-edit{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+.pl-date{flex:1;font-size:11px;color:var(--mute)}
+.dbtn{position:relative;display:block;width:100%;margin-top:3px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font:600 13px "Segoe UI",sans-serif;text-align:left;cursor:pointer}
+.dbtn input[type=date]{position:absolute;left:0;bottom:0;width:100%;height:1px;padding:0;border:0;opacity:0;pointer-events:none}
+.ringw{position:relative;width:min(240px,70vw);aspect-ratio:1;margin:4px auto 14px}
+.ringw svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ringc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.timer.big{font-size:clamp(34px,11vw,46px)}
+.chip{background:none;border:1px solid var(--line);color:var(--mute);border-radius:16px;padding:5px 12px;font:600 12px var(--display);cursor:pointer}
+.chip.on{background:var(--amber);border-color:var(--amber);color:#1C1D1B}
+.chip:disabled{opacity:.45;cursor:default}
+.mini{display:flex;align-items:center;gap:10px;padding:7px 14px;background:var(--panel2);border-top:1px solid var(--line);cursor:pointer}
+.mini b{font:700 18px var(--display);font-variant-numeric:tabular-nums;color:var(--amber)}
+.toast{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;background:var(--panel2);border-radius:6px;padding:8px 10px;margin-top:10px;font-size:13px}
+.btn.sm{padding:5px 10px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:default}
+.ink{position:relative;background:none;border:0;border-bottom:1px dashed var(--mute);color:inherit;font:inherit;padding:0 2px;cursor:pointer}
+.ink:hover{color:var(--amber);border-color:var(--amber)}
+.sheet{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.55);display:flex;justify-content:center;align-items:flex-end}
+.sheetin{width:min(820px,100%);max-height:92%;overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:12px 12px 0 0;padding:14px calc(14px) calc(14px + env(safe-area-inset-bottom))}
+/* mobile: App renders its own .shell/.wrap inside .content */
+#root .shell{display:block;height:auto;padding-top:0}.wrap{max-width:none}
+.botnav button .ico{width:22px;height:22px;font-size:0}
+.ico svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;display:block}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <span class="topbar-title">GATE CC</span>
+    <div class="topbar-right" id="topbar-right"></div>
+  </div>
+  <div class="content" id="content">
+    <div id="root"></div>
+  </div>
+  <nav class="botnav" id="botnav">
+    <button class="on" data-tab="today">
+      <span class="ico-bar"></span>
+      <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3.5V6M12 18v2.5M3.5 12H6M18 12h2.5"/></svg></span>
+      <span>Today</span>
+    </button>
+    <button data-tab="syllabus">
+      <span class="ico-bar" style="display:none"></span>
+      <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 0 4 21.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 1 1.5 1.5z"/></svg></span>
+      <span>Syllabus</span>
+    </button>
+    <button data-tab="tests">
+      <span class="ico-bar" style="display:none"></span>
+      <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h9l4 4V20.5H6z"/><path d="M15 3.5v4h4M9 13l2 2 4-4.5"/></svg></span>
+      <span>Tests</span>
+    </button>
+    <button data-tab="settings">
+      <span class="ico-bar" style="display:none"></span>
+      <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.6M12 18.6v2.6M4.6 7.4l2.2 1.3M17.2 15.3l2.2 1.3M4.6 16.6l2.2-1.3M17.2 8.7l2.2-1.3"/></svg></span>
+      <span>More</span>
+    </button>
+  </nav>
+  <div class="float-timer" id="float-timer"></div>
+</div>
+<script>
+  document.body.dataset.platform = 'mobile';
+  // Wire bottom nav clicks → React
+  document.getElementById('botnav').addEventListener('click', e => {
+    const btn = e.target.closest('[data-tab]');
+    if (!btn) return;
+    document.querySelectorAll('.botnav [data-tab]').forEach(b => {
+      const on = b === btn;
+      b.classList.toggle('on', on);
+      b.querySelector('.ico-bar').style.display = on ? 'block' : 'none';
+    });
+    window.__gccSetTab?.(btn.dataset.tab);
+  });
+</script>
+<script src="bundle.js"></script>
+</body>
+</html>
