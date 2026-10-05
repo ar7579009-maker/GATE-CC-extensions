@@ -9,5 +9,6 @@ rw('index-mobile.html', (h) => h.replace('web/manifest-mobile.webmanifest', 'man
 rw('manifest-mobile.webmanifest', (m) => m.replace(/\.\.\//g, './'));
 const sw = path.join('www', 'sw.js'); // stamp the cache name so every deploy replaces the old cache
 fs.writeFileSync(sw, fs.readFileSync(sw, 'utf8').replace('__BUILD__', String(Date.now())));
+if (process.argv.includes('--android')) fs.copyFileSync(path.join('www', 'index-mobile.html'), path.join('www', 'index.html'));   // the APK opens index.html: give it the phone shell
 fs.writeFileSync(path.join('www', '.nojekyll'), '');
 console.log('www/ ready');

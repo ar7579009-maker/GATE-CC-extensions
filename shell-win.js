@@ -8,3 +8,9 @@ document.getElementById('sidenav').addEventListener('click', e => {
   document.querySelectorAll('.sidenav [data-tab]').forEach(b => b.classList.toggle('on', b === btn));
   window.__gccSetTab?.(btn.dataset.tab);
 });
+// Always-on-top pin (state kept by main.js, so it survives restarts)
+const pb = document.getElementById('pinbtn');
+const showPin = (on) => { pb.classList.toggle('on', !!on); pb.setAttribute('aria-pressed', String(!!on)); document.getElementById('pintxt').textContent = on ? 'on top' : ''; };
+window.gcc?.getPin?.().then(showPin).catch(() => {});
+window.gcc?.onPin?.(showPin);
+pb.addEventListener('click', () => window.gcc?.pin?.().then(showPin).catch(() => {}));

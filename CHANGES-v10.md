@@ -1,5 +1,17 @@
 # v10.2 changes
 
+## v10.3
+
+The confirmed UI is `docs/gcc-working-preview.html`; it replaces `docs/gcc-preview.html`.
+
+- Windows is a portrait side panel (default 440 x 780, minimum 360 x 560): title bar with an always-on-top pin (also Ctrl+T, remembered between runs), five-tab strip along the top (Today, Plan, Subjects, Tests, Settings), no sidebar.
+- Android/phone shell has the same five tabs on a bottom bar (Plan added; Syllabus renamed Subjects). `npm run android` now builds the phone shell as the APK's start page (before, the APK opened the web shell).
+- Today: timer, then Do now + checklist, then the verdict. The planner calculator and the deadline card moved to Plan on every platform; Plan no longer stacks under Today.
+- Web fallback nav: Today, Plan, Subjects, Tests (+ settings gear).
+- Sync: new `twodevice.test.mjs` runs the real merge code for extension file -> Windows import -> server -> phone and back (ticks, pw state + duration, tests, results, error tags, no duplicates, manual ticks survive a re-sync). New fixture `fixtures/pw-sync-sample.json`.
+- Not run here: `npm run dist`, the exe, the APK, live Supabase, live PW.
+
+
 New
 - PW sync import: `applyPwSync` in io.js (+ pwsync.test.mjs). Reads the `pw-sync` v3 JSON from the Chrome extension. Only adds ticks, never removes; stores `pw` state and `dur` on lectures; matches or adds tests; upserts PW results into mocks without touching your concept/calc/time/silly tags. Small `pwSync` summary is synced (phone sees it).
 - Windows auto-import: main.js watches Downloads\GCC\pw-sync-latest.json (2 s poll, 1.5 s debounce), IPC `pw:snapshot` / `pw:latest`, preload `pwLatest` / `onPwSnapshot`. Applied silently with a toast when newer. Settings keeps an Import file fallback with a preview.
@@ -11,6 +23,7 @@ New
 - docs/gcc-preview.html: design reference.
 
 Changed
+- PW sync test matching: besides exact name, matches abbreviations (COA, DBMS), leading zeros (SWT 05 = SWT 5) and numbered exams (MST n), so real data updates 88 tests and adds 7 instead of duplicating 20.
 - Windows/mobile shells: missing class definitions added; built-in bottom tabs hidden on Windows; emoji nav icons replaced with inline SVG line icons.
 - package.json: version 10.2.0; build.files includes index-win.html, index-mobile.html, icon.ico and web/.
 

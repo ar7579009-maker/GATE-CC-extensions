@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GATE Command Center · working preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#141210;--pn:#181512;--cd:#1e1b18;--ln:#322d28;--tx:#efe9df;--mu:#a39a8f;--ac:#e0892b;--bad:#ea6b53;--ok:#6fb99c;--on:#1a1209;--tb:#0f0d0b}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4efe7;--pn:#ebe4d8;--cd:#fffaf2;--ln:#d9cfbf;--tx:#241f19;--mu:#6d6458;--ac:#b8620f;--bad:#b83a25;--ok:#2f7d62;--on:#fff;--tb:#e2d9ca}}
+:root[data-theme="light"]{--bg:#f4efe7;--pn:#ebe4d8;--cd:#fffaf2;--ln:#d9cfbf;--tx:#241f19;--mu:#6d6458;--ac:#b8620f;--bad:#b83a25;--ok:#2f7d62;--on:#fff;--tb:#e2d9ca}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,"Segoe UI",Roboto,sans-serif}
+header.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:18px 22px 4px;max-width:1000px;margin:auto}
+header.top h1{margin:0;font:700 26px "Barlow Condensed",Impact,sans-serif;color:var(--ac)}
+.stage{display:flex;gap:40px;justify-content:center;flex-wrap:wrap;padding:14px 22px 40px}
+.dev>p{margin:0 0 8px;text-align:center}
+.frame{display:flex;flex-direction:column;height:780px;max-width:100%;background:var(--bg);border:1px solid var(--ln);overflow:hidden}
+.frame[data-p=w]{width:440px;border-radius:10px}.frame[data-p=a]{width:390px;border-radius:28px}
+.mu{color:var(--mu);font-size:13px}.n{font-family:"Barlow Condensed",Impact,sans-serif;font-weight:700;margin:0}
+.tb{display:flex;justify-content:space-between;align-items:center;height:36px;padding-left:12px;background:var(--tb);flex:none}
+.wc{display:flex;color:var(--mu);align-items:center}.wb{width:44px;height:36px;background:none;border:0;color:inherit;cursor:pointer}.wb.on{color:var(--ac)}
+.nav{display:flex;flex:none;background:var(--pn)}.nav.w{border-bottom:1px solid var(--ln)}.nav.a{border-top:1px solid var(--ln)}
+.u,.t{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;background:none;color:var(--mu);font:inherit;font-size:12px;cursor:pointer}
+.u{height:54px;border-bottom:2px solid transparent}.t{height:64px}.on.u,.on.t{color:var(--ac);font-weight:600}.on.u{border-bottom-color:var(--ac)}
+.ah{display:flex;justify-content:space-between;align-items:baseline;padding:16px 16px 4px;flex:none}.ah h1{font-size:30px}
+.body{flex:1;min-height:0;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.c{background:var(--cd);border:1px solid var(--ln);border-radius:12px;padding:14px}.ctr{text-align:center}
+.r{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.big{font-size:72px;line-height:1.05}.run .big{color:var(--ac)}
+.bar{height:7px;background:var(--ln);border-radius:4px;overflow:hidden;margin:6px 0}.bar i{display:block;height:100%;background:var(--ac)}
+button{font:inherit}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.b{background:var(--ac);color:var(--on);border:0;border-radius:8px;padding:12px 18px;font-weight:600;cursor:pointer;flex:1}
+.s{background:none;color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:12px 18px;cursor:pointer;flex:1}
+.p{border:1px solid var(--ln);border-radius:999px;padding:6px 14px;min-height:36px;font-size:13px;color:var(--mu);background:none;white-space:nowrap;cursor:pointer}
+.p.on{background:var(--ac);border-color:var(--ac);color:var(--on);font-weight:600}
+.f{background:var(--bg);color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:8px 10px;min-height:40px;font:inherit}
+.pl{display:flex;gap:6px;flex-wrap:wrap}.sc{overflow-x:auto;flex-wrap:nowrap}
+.i{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--ln);min-height:44px}.i input{width:20px;height:20px;accent-color:var(--ac)}
+.v{display:flex;gap:18px;margin:6px 0}.v b{display:block;font:700 34px/1 "Barlow Condensed",Impact,sans-serif}.v small{font-size:14px;color:var(--mu)}
+.bad{color:var(--bad)}.ok{color:var(--ok)}h2{margin:0;font:700 20px "Barlow Condensed",Impact,sans-serif}
+.dot{color:var(--mu)}.go{color:var(--ac)}
+.g{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center;margin:8px 0}.g .f{width:96px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--ln)}
+@media (max-width:480px){.stage{padding:10px 8px}.frame[data-p=a]{border-radius:20px}}
+</style></head><body>
+<header class="top"><h1>GATE Command Center · working preview</h1><span class="mu">One codebase, two shells. Both frames share the same state.</span></header>
+<div class="stage">
+<div class="dev"><p class="mu">Windows side panel (440 × 780)</p><div class="frame" data-p="w" id="fw"></div></div>
+<div class="dev"><p class="mu">Android (390 × 780)</p><div class="frame" data-p="a" id="fa"></div></div>
+</div>
+<script>
+const TODAY=new Date(2026,9,5),DAYS=87,GATE=124,LEC0=330,VID0=763.5,OTH=197; // sample hours, replaced by real sync data in the app
+const SUBJ=[["Operating Systems",12,58],["Theory of Computation",16,62],["DBMS",8,55],["General Aptitude",6,40],["C Programming",15,36],["Fundamentals of C",7,28],["Computer Networks",1,30],["Computer Organization",0,32],["Calculus & Optimization",0,18],["Linear Algebra",0,20],["Verbal Aptitude",0,16]];
+const ITEMS=[["C Programming · Pointers 3",52],["Theory of Computation · DFA minimization",64],["Revision (+7 days): Operating Systems · Deadlocks",0],["PYQs: 10 questions, C Programming",0]];
+const TESTS=[["Database Management System : Weekly Test 04","weekly","2026-10-11",15,30],["Theory of Computation : Weekly Test 05","weekly","2026-10-11",20,30],["General Aptitude : Weekly Test 02","weekly","2026-10-11",15,30],["Theory of Computation : Weekly Test 04","weekly","2026-10-04",27,30],["Database Management System : Weekly Test 03","weekly","2026-10-04",15,35],["Operating Systems : Weekly Test 02","weekly","2026-09-27",20,30],["General Aptitude : Weekly Test 01","weekly","2026-09-27",15,30],["Linear Algebra : Weekly Test 01","weekly","2026-06-07",20,40,"2.71"],["Mock Test 05","mock","2024-02-28",100,180]];
+const TABS=[["today","Today"],["plan","Plan"],["subj","Subjects"],["tests","Tests"],["set","Settings"]];
+const ICO={today:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',plan:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',subj:'<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',tests:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 14l2 2 4-4"/>',set:'<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',pin:'<path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/>',min:'<path d="M7 12h10"/>',x:'<path d="M7 7l10 10M17 7L7 17"/>'};
+const svg=n=>`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n]}</svg>`;
+const KEEP=["today","chk","cur","goal","hpd","win","speed","tags","rules","theme","last"];
+const S={tab:{w:"today",a:"today"},pin:false,run:false,t0:0,el:0,mode:"Learn",subj:"Computer Networks",note:"",today:6840,chk:[false,false,false,false],cur:false,goal:"8",hpd:"8",win:"14",speed:"1.5",tags:[],rules:{apt:45,math:90,core:240,pyq:10},theme:"auto",last:"",kind:"all",stat:"all"};
+try{Object.assign(S,JSON.parse(localStorage.getItem("gcc-preview")||"{}"))}catch(e){}
+const num=(v,d,min)=>{const x=parseFloat(v);return x>=min?x:d};
+const hms=s=>[s/3600|0,s%3600/60|0,Math.floor(s%60)].map(x=>String(x).padStart(2,"0")).join(":");
+const el=()=>S.el+(S.run?(Date.now()-S.t0)/1000:0);
+const goal=()=>num(S.goal,8,1),hpd=()=>num(S.hpd,8,0.5),win=()=>num(S.win,14,1),spd=()=>num(S.speed,1.5,1);
+const left=()=>LEC0-(S.cur?1:0)-(S.chk[0]?1:0)-(S.chk[1]?1:0);
+const vid=()=>VID0-(S.cur?31/60:0)-(S.chk[0]?52/60:0)-(S.chk[1]?64/60:0);
+const rem=()=>vid()/spd()+OTH;
+const dm=n=>new Date(TODAY.getTime()+n*864e5).toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+function timer(){const run=S.run,g=goal(),st=run?"running":el()>0?"paused":"ready";
+return `<section class="c ctr ${run?"run":""}"><div class="r"><span class="mu"><span class="dot ${run?"go":""}">●</span> ${S.mode} · ${st}</span><span class="mu td"></span></div><div class="n big tm">${hms(el())}</div><div class="bar tbar"><i></i></div>
+<div class="r"><select class="f" aria-label="Subject" data-k="subj">${SUBJ.map(s=>`<option${s[0]==S.subj?" selected":""}>${s[0]}</option>`).join("")}</select><span class="pl">${["Learn","Practice","Revise"].map(m=>`<button class="p${m==S.mode?" on":""}" data-a="mode:${m}">${m}</button>`).join("")}</span></div>
+<input class="f" style="width:100%;margin:8px 0" aria-label="Session note" data-k="note" placeholder="Session note (what did you cover?)" value="${S.note.replace(/"/g,"&quot;")}">
+<div class="r"><button class="b" data-a="go">${run?"Pause":el()>0?"Resume":"Start"}</button><button class="s" data-a="stop">Stop and save</button></div>${S.last?`<div class="mu" style="margin-top:6px">Saved ${S.last}</div>`:""}</section>`}
+function verdict(){const g=goal(),need=rem()/DAYS,bad=need>g;
+return `<section class="c"><div class="r"><h2 class="${bad?"bad":"ok"}">${bad?"Off track":"On track"} for 31 Dec</h2><span class="mu">${DAYS} d · GATE in ${GATE} d</span></div><div class="v"><div class="mu"><b class="${bad?"bad":""}">${need.toFixed(1)}<small> h/day</small></b>needed</div><div class="mu"><b>4.0<small> h/day</small></b>last 7 days</div><div class="mu"><b>${g}<small> h/day</small></b>goal</div></div><div class="mu">${left()} lectures left, about ${Math.round(rem())} h at ${spd()}x. Watched ${65+330-left()} / 395.</div></section>`}
+function todayBody(){return timer()+`<section class="c"><div class="mu">Do now</div><div style="font-size:17px;font-weight:600;margin-bottom:6px">Computer Networks · Lecture 2 (resume 41:10)</div><button class="s" style="width:100%" data-a="cur">${S.cur?"Watched ✓":"Mark lecture watched"}</button>`+ITEMS.map((t,i)=>`<label class="i"><input type="checkbox" data-a="chk:${i}"${S.chk[i]?" checked":""}><span>${t[0]}${t[1]?` <span class="mu">${t[1]} min</span>`:""}</span></label>`).join("")+`</section>`+verdict()}
+function planBody(){const R=rem(),h=hpd(),d=Math.ceil(R/h),late=d-DAYS,r=S.rules,tot=r.apt+r.math+r.core;
+const rule=(k,l,u)=>`<label class="r" style="margin:6px 0"><span>${l}</span><input class="f" style="width:84px" type="number" min="0" data-k="r_${k}" aria-label="${l}" value="${r[k]}"></label>`;
+return `<section class="c"><h2>Planner</h2><div class="g"><span>Playback speed</span><select class="f" data-k="speed" aria-label="Playback speed">${["1","1.25","1.5","1.75","2"].map(x=>`<option value="${x}"${x==S.speed?" selected":""}>${x}x</option>`).join("")}</select><span>Study hours per day</span><input class="f" type="number" min="0.5" step="0.5" data-k="hpd" aria-label="Study hours per day" value="${S.hpd}"><span>Window (days)</span><input class="f" type="number" min="1" data-k="win" aria-label="Window in days" value="${S.win}"></div>
+<div style="border-top:1px solid var(--ln);padding-top:8px">At ${spd()}x, <b>${Math.round(R)} h</b> of work remain. At ${h} h/day you finish in <b>${d} days</b> (${dm(d)}), <b class="${late>0?"bad":"ok"}">${Math.abs(late)} day${Math.abs(late)==1?"":"s"} ${late>0?"late":"early"}</b>. The ${win()}-day window covers ${Math.round(h*win())} h. To finish by 31 Dec: <b>${(R/DAYS).toFixed(1)} h/day</b>.</div></section>
+<section class="c"><div class="r"><div><span class="n" style="font-size:38px">${DAYS}</span><span class="mu"> days to syllabus completion · 31 Dec 2026</span></div><span class="mu">GATE 6 Feb 2027 · ${GATE} d</span></div></section>
+<section class="c"><h2>Daily rules</h2>${rule("apt","Aptitude (min)")}${rule("math","Maths (min)")}${rule("core","Core (min)")}${rule("pyq","PYQs (questions)")}<div class="mu">${tot} min of fixed blocks (${(tot/60).toFixed(1)} h) before lectures.</div></section>`}
+function subjBody(){const done=SUBJ.reduce((a,s)=>a+s[1],0)+(330-left()),tot=395;
+return `<section class="c"><div class="r"><h2>Syllabus</h2><span class="mu">${done} / ${tot} lectures</span></div><div class="mu">Sample split per subject until the PW sync fills real counts.</div>`+SUBJ.map(s=>`<div class="row" style="flex-direction:column;gap:2px"><div class="r"><span>${s[0]}</span><span class="mu">${s[1]} / ${s[2]}</span></div><div class="bar"><i style="width:${s[1]/s[2]*100}%"></i></div></div>`).join("")+`</section>`}
+function testsBody(){const st=t=>t[5]?"attempted":new Date(t[2])>TODAY?"upcoming":"missed",col={attempted:"ok",missed:"bad",upcoming:""};
+const rows=TESTS.filter(t=>(S.kind=="all"||t[1]==S.kind)&&(S.stat=="all"||st(t)==S.stat));
+const pill=(g,l)=>`<button class="p${S[g]==l?" on":""}" data-a="${g}:${l}">${l}</button>`;
+return `<section class="c"><div class="r"><h2>Linear Algebra : Weekly Test 01</h2><span class="n" style="font-size:36px;line-height:1" ><span class="bad">2.71</span><small class="mu" style="font-size:15px">/20</small></span></div><div class="mu">4 correct · 9 wrong · 0 skipped · 30.8% accuracy</div><div class="pl" style="margin-top:8px;align-items:center"><span class="mu">Marks lost to:</span>${["concept","calc","time","silly"].map(t=>`<button class="p${S.tags.includes(t)?" on":""}" aria-pressed="${S.tags.includes(t)}" data-a="tag:${t}">${t}</button>`).join("")}</div></section>
+<div class="pl sc">${["all","weekly","mock"].map(k=>pill("kind",k)).join("")}</div><div class="pl sc">${["all","attempted","missed","upcoming"].map(k=>pill("stat",k)).join("")}</div>
+<section class="c" style="padding:2px 14px">${rows.length?rows.map(t=>{const s=st(t);return `<div class="row"><span>${t[0]}<br><span class="mu">${new Date(t[2]).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})} · ${t[3]} marks · ${t[4]} min</span></span><span class="${col[s]}" style="text-align:right;font-size:14px">${s}${t[5]?`<br>${t[5]}/${t[3]}`:""}</span></div>`}).join(""):`<div class="mu" style="padding:14px 0">No tests match.</div>`}</section>`}
+function setBody(){const th=k=>`<button class="p${S.theme==k?" on":""}" data-a="theme:${k}">${k}</button>`;
+return `<section class="c"><h2>Daily goal</h2><label class="r" style="margin-top:8px"><span>Study hours per day</span><input class="f" style="width:84px" type="number" min="1" step="0.5" data-k="goal" aria-label="Daily goal in hours" value="${S.goal}"></label><div class="mu" style="margin-top:6px">Shared by the timer, verdict and planner.</div></section><section class="c"><h2>Theme</h2><div class="pl" style="margin-top:8px">${["auto","dark","light"].map(th).join("")}</div></section><section class="c"><h2>Demo data</h2><div class="mu" style="margin:6px 0 10px">Sample hours and subject split. The app reads real values from the PW sync file.</div><button class="s" style="width:100%" data-a="reset">Reset demo</button></section>`}
+const BODY={today:todayBody,plan:planBody,subj:subjBody,tests:testsBody,set:setBody};
+function frame(p){const tab=S.tab[p],ttl=TABS.find(t=>t[0]==tab)[1];
+const nav=`<nav class="nav ${p}">`+TABS.map(([k,l])=>`<button class="${p=="w"?"u":"t"}${tab==k?" on":""}" data-a="tab:${k}"${tab==k?' aria-current="page"':""}>${svg(k)}${l}</button>`).join("")+`</nav>`,body=`<main class="body">${BODY[tab]()}</main>`;
+if(p=="w")return `<div class="tb"><span class="mu">GATE 2027 · side panel${S.pin?" · on top":""}</span><span class="wc"><button class="wb${S.pin?" on":""}" data-a="pin" aria-pressed="${S.pin}" aria-label="Always on top">${svg("pin")}</button><button class="wb" aria-label="Minimize (demo)">${svg("min")}</button><button class="wb" aria-label="Close (demo)">${svg("x")}</button></span></div>${nav}${body}`;
+return `<header class="ah"><h1 class="n">${ttl}</h1><span class="mu">Mon 5 Oct · ${DAYS} d to 31 Dec</span></header>${body}${nav}`}
+function save(){try{const o={};KEEP.forEach(k=>o[k]=S[k]);localStorage.setItem("gcc-preview",JSON.stringify(o))}catch(e){}}
+function render(){const a=document.activeElement,fk=a&&a.dataset&&a.dataset.k?a.closest(".frame").dataset.p+a.dataset.k:null,ss=a&&a.selectionStart,keepScroll={};
+["fw","fa"].forEach(id=>{const b=document.querySelector("#"+id+" .body");keepScroll[id]=b?b.scrollTop:0});
+fw.innerHTML=frame("w");fa.innerHTML=frame("a");
+["fw","fa"].forEach(id=>{const b=document.querySelector("#"+id+" .body");if(b)b.scrollTop=keepScroll[id]});
+if(fk){const n=document.querySelector(`#f${fk[0]} [data-k="${fk.slice(1)}"]`);if(n){n.focus();try{if(ss!=null)n.setSelectionRange(ss,ss)}catch(e){}}}
+document.documentElement.dataset.theme=S.theme=="auto"?"":S.theme;if(S.theme=="auto")document.documentElement.removeAttribute("data-theme");tick();save()}
+function tick(){const e=el(),h=(S.today+e)/3600,g=goal();document.querySelectorAll(".tm").forEach(n=>n.textContent=hms(e));document.querySelectorAll(".td").forEach(n=>n.textContent=`Today ${h.toFixed(1)} / ${g} h`);document.querySelectorAll(".tbar i").forEach(n=>n.style.width=Math.min(100,h/g*100)+"%")}
+setInterval(tick,1000);
+document.addEventListener("click",e=>{const t=e.target.closest("[data-a]");if(!t)return;const [a,v]=t.dataset.a.split(":"),p=t.closest(".frame")?.dataset.p;
+if(a=="tab")S.tab[p]=v;else if(a=="mode")S.mode=v;else if(a=="go"){if(S.run){S.el=el();S.run=false}else{S.t0=Date.now();S.run=true}}
+else if(a=="stop"){const e2=el();if(e2>=1){S.today+=e2;S.last=`${hms(e2)} · ${S.mode} · ${S.subj}`}S.run=false;S.el=0}
+else if(a=="cur")S.cur=!S.cur;else if(a=="chk"){S.chk[+v]=t.checked}else if(a=="tag"){S.tags=S.tags.includes(v)?S.tags.filter(x=>x!=v):[...S.tags,v]}
+else if(a=="kind"||a=="stat")S[a]=v;else if(a=="pin")S.pin=!S.pin;else if(a=="theme")S.theme=v;
+else if(a=="reset"){localStorage.removeItem("gcc-preview");location.reload();return}
+render()});
+document.addEventListener("input",e=>{const k=e.target.dataset.k;if(!k)return;const v=e.target.value;
+if(k=="note"){S.note=v;return}if(k.startsWith("r_"))S.rules[k.slice(2)]=Math.max(0,+v||0);else S[k]=v;render()});
+render();
+</script></body></html>

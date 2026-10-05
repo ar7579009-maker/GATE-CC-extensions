@@ -1,6 +1,6 @@
 {
   "name": "gate-cse-2027-command-center",
-  "version": "10.2.0",
+  "version": "10.3.0",
   "description": "GATE CSE 2027 Command Center",
   "author": "Abhinav",
   "main": "main.js",
@@ -9,8 +9,8 @@
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder --win",
     "build:web": "npm run build && node scripts/prep-www.js",
-    "android": "npm run build:web && npx cap sync android",
-    "test": "node sync-core.test.mjs && node timer-engine.test.mjs && node planner.test.mjs && node pwsync.test.mjs && node layout.test.mjs && node syllabus-stats.test.mjs && node tests-view.test.mjs",
+    "android": "npm run build && node scripts/prep-www.js --android && npx cap sync android",
+    "test": "node sync-core.test.mjs && node timer-engine.test.mjs && node planner.test.mjs && node pwsync.test.mjs && node layout.test.mjs && node syllabus-stats.test.mjs && node tests-view.test.mjs && node twodevice.test.mjs",
     "build:html": "npm run build && node scripts/build-single.js"
   },
   "devDependencies": {

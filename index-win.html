@@ -14,7 +14,7 @@
   --ink:#EDEAE2;--mute:#8A8880;--dim:#5A5850;
   --amber:#D68A2B;--green:#4A7C6C;--red:#A8452F;--blue:#7B8CDE;
   --display:Bahnschrift,"DIN Alternate","Arial Narrow",sans-serif;
-  --nav-w:200px;
+  --nav-w:0px;
 }
 [data-theme=light]{
   --bg:#F4F1EA;--panel:#FFF;--panel2:#ECE8DE;--line:#D6D0C2;
@@ -27,26 +27,26 @@ body{background:var(--bg);color:var(--ink);font:14px/1.5 "Segoe UI",-apple-syste
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
 
 /* ── shell: titlebar + sidebar + content ── */
-.titlebar{height:32px;-webkit-app-region:drag;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 14px;gap:10px}
+.titlebar{height:36px;-webkit-app-region:drag;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 140px 0 12px;gap:8px}
 .titlebar-title{font:600 12px var(--display);letter-spacing:.06em;color:var(--mute);flex:1}
 .titlebar-chips{display:flex;gap:6px;-webkit-app-region:no-drag}
 
-.layout{display:flex;height:calc(100vh - 32px)}
+.layout{display:flex;flex-direction:column;height:calc(100vh - 36px)}
 
 /* sidebar nav */
-.sidenav{width:var(--nav-w);flex-shrink:0;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+.sidenav{flex:none;background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-direction:row;overflow:hidden}
 .sidenav-logo{padding:18px 16px 10px;font:700 13px var(--display);letter-spacing:.08em;color:var(--amber)}
 .sidenav-sub{padding:0 16px 6px;font:600 10px var(--display);letter-spacing:.1em;color:var(--dim);text-transform:uppercase}
-.sidenav button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;color:var(--mute);padding:9px 16px;font:600 13px var(--display);cursor:pointer;text-align:left;border-radius:0;transition:background .1s}
+.sidenav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:54px;min-width:0;background:none;border:0;border-bottom:2px solid transparent;color:var(--mute);padding:0 2px;font:600 12px var(--display);cursor:pointer;border-radius:0}
 .sidenav button:hover{background:var(--panel2);color:var(--ink)}
-.sidenav button.on{background:color-mix(in srgb,var(--amber) 12%,transparent);color:var(--amber);border-left:3px solid var(--amber)}
+.sidenav button.on{color:var(--amber);border-bottom-color:var(--amber);background:none}
 .sidenav button .ico{font-size:15px;width:18px;text-align:center;flex-shrink:0}
 .sidenav-spacer{flex:1}
 .sidenav-bottom{padding:10px 16px 14px;border-top:1px solid var(--line)}
 
 /* main content area */
-.content{flex:1;overflow:auto;padding:20px 28px 32px;max-width:100%}
-.content-inner{max-width:860px}
+.content{flex:1;min-height:0;overflow:auto;padding:12px 12px 24px;max-width:100%}
+.content-inner{max-width:none}
 
 /* ── cards ── */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:14px}
@@ -163,7 +163,8 @@ th{color:var(--mute);font-weight:500;border-top:0}
 /* win: App renders its own .shell/.wrap inside the content area; no bottom tab row on desktop */
 .shell{display:block}.wrap{max-width:none}
 body[data-platform=win] nav:not(.sidenav),body[data-platform=win] .botnav{display:none!important}
-.sidenav button .ico{width:18px;height:18px;font-size:0}
+.sidenav button .ico{width:20px;height:20px;font-size:0}
+.pinbtn{-webkit-app-region:no-drag;display:flex;align-items:center;gap:4px;background:none;border:0;color:var(--mute);height:36px;padding:0 8px;cursor:pointer;font:600 11px var(--display)}.pinbtn.on{color:var(--amber)}.pinbtn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
 .ico svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;display:block}
 .more .more-sec{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}.more .more-sec>.card{border:0;background:none;padding:0;margin:0;box-shadow:none}.more>summary{list-style:none}
 </style>
@@ -172,24 +173,11 @@ body[data-platform=win] nav:not(.sidenav),body[data-platform=win] .botnav{displa
 <!-- Windows layout shell: titlebar + sidebar + content area -->
 <!-- bundle.js selects this layout via data-platform="win" on body -->
 <div class="titlebar">
-  <span class="titlebar-title">GATE CSE 2027 COMMAND CENTER</span>
-  <div class="titlebar-chips" id="hd-chips"></div>
+  <span class="titlebar-title">GATE 2027 · side panel</span>
+  <button class="pinbtn" id="pinbtn" aria-pressed="false" aria-label="Always on top (Ctrl+T)" title="Always on top (Ctrl+T)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></svg><span id="pintxt"></span></button>
 </div>
 <div class="layout">
-  <nav class="sidenav" id="sidenav">
-    <div class="sidenav-logo">GCC</div>
-    <div class="sidenav-sub">Study</div>
-    <button class="on" data-tab="today"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3.5V6M12 18v2.5M3.5 12H6M18 12h2.5"/></svg></span>Today</button>
-    <button data-tab="plan"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>Plan</button>
-    <button data-tab="syllabus"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 0 4 21.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 1 1.5 1.5z"/></svg></span>Syllabus</button>
-    <div class="sidenav-sub" style="margin-top:8px">Progress</div>
-    <button data-tab="tests"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h9l4 4V20.5H6z"/><path d="M15 3.5v4h4M9 13l2 2 4-4.5"/></svg></span>Tests</button>
-    <div class="sidenav-spacer"></div>
-    <div class="sidenav-bottom">
-      <button data-tab="settings"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.6M12 18.6v2.6M4.6 7.4l2.2 1.3M17.2 15.3l2.2 1.3M4.6 16.6l2.2-1.3M17.2 8.7l2.2-1.3"/></svg></span>Settings</button>
-    </div>
-    <div id="timer-pin" class="timer-pin" style="display:none"></div>
-  </nav>
+  <nav class="sidenav" id="sidenav" aria-label="Sections"><button class="on" data-tab="today"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Today</button><button data-tab="plan"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></span>Plan</button><button data-tab="syllabus"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg></span>Subjects</button><button data-tab="tests"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 14l2 2 4-4"/></svg></span>Tests</button><button data-tab="settings"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></span>Settings</button></nav>
   <main class="content" id="content">
     <div class="content-inner" id="root"></div>
   </main>

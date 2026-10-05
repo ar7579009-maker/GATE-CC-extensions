@@ -531,12 +531,12 @@ function App() {
   useEffect(() => { setupWeb(); }, []);
   useEffect(() => { setupNative(s); }, [s.notify, s.remindAt]);
   useEffect(() => { setS(syncRevq); }, [s.subjects]);
-  const tabs = [['today', 'Today'], ['syllabus', 'Syllabus'], ['tests', 'Tests']];
+  const tabs = [['today', 'Today'], ['plan', 'Plan'], ['syllabus', 'Subjects'], ['tests', 'Tests']];
   return (<LayoutCtx.Provider value={layoutCtx}>
     <div className="shell">
       <main><div className="wrap">
         {saveErr && <div className="card" role="alert" style={{ borderColor: 'var(--red)', color: 'var(--red)' }}>Couldn't save to this device (storage full or blocked). Open Settings and export a backup now.</div>}
-        {tab === 'today' && <><Today s={s} set={set} eng={eng} D={D} />{platform !== 'win' && <><h2 style={{ margin: '18px 2px 8px' }}>Plan</h2><PlanTab s={s} set={set} D={D} /></>}</>}
+        {tab === 'today' && <Today s={s} set={set} eng={eng} D={D} />}
         {tab === 'plan' && <PlanTab s={s} set={set} D={D} />}
         {tab === 'syllabus' && <Syllabus s={s} set={set} />}
         {tab === 'tests' && <Mocks s={s} set={set} />}
@@ -584,9 +584,14 @@ function Today({ s, set, eng, D }) {
   const pyq = { count: pyqCount, dec: () => set('rules', (r) => ({ ...r, [today]: { ...r[today], pyqCount: Math.max(0, pyqCount - 1) } })), inc: () => set('rules', (r) => ({ ...r, [today]: { ...r[today], pyqCount: pyqCount + 1 } })) };
   return (<>
     <Hideable id="timer"><TimerCard s={s} set={set} eng={eng} rows={ROWS} todaySec={todaySec} /></Hideable>
-    <Verdict P={P} s={s} set={set} />
-    <Hideable id="calc"><PaceCalc P={P} s={s} set={set} today={today} /></Hideable>
     <TodayList P={P} s={s} set={set} pyq={pyq} />
+    <Verdict P={P} s={s} set={set} />
+
+  </>);
+}
+
+function DeadlineCard({ s, set }) {
+  return (<>
     <Hideable id="deadline"><div className="card">
       <div className="row sb" style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}><div style={{ minWidth: 0 }}><div className="num">{daysTo(s.targetDate)}</div><div className="mute small" style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>days to syllabus completion · <InlineDate value={s.targetDate} onChange={(v) => set('targetDate', v)} fmt={sdy} /></div></div>
         </div>
@@ -629,7 +634,7 @@ function DailyRules({ s, set, D }) {
 }
 
 function PlanTab({ s, set, D }) {
-  return <><Hideable id="schedule"><Plan s={s} set={set} /></Hideable><Hideable id="rules"><DailyRules s={s} set={set} D={D} /></Hideable></>;
+  return <><Hideable id="calc"><PaceCalc P={D.P} s={s} set={set} today={D.today} /></Hideable><DeadlineCard s={s} set={set} /><Hideable id="schedule"><Plan s={s} set={set} /></Hideable><Hideable id="rules"><DailyRules s={s} set={set} D={D} /></Hideable></>;
 }
 
 /* ───────── Import PW sync file (pw-sync-latest.json) ───────── */

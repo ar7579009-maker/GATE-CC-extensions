@@ -65,4 +65,16 @@ assert.ok(pwIsNewer(snap, undefined)); assert.ok(pwIsNewer(snap, { updated: '202
 assert.ok(!pwIsNewer(snap, { updated: snap.updated })); assert.ok(!pwIsNewer(snap, { updated: '2026-10-06T00:00:00Z' })); assert.ok(!pwIsNewer(null, undefined));
 assert.deepStrictEqual(pwToast({ ticked: 58, unmatched: [], mismatch: [] }), { msg: 'PW synced: 58 lectures done', warn: '' });
 assert.strictEqual(pwToast({ ticked: 1, unmatched: ['X'], mismatch: ['a', 'b'] }).warn, 'unmatched: X · 2 chapter mismatches');
+// test-name aliases: abbreviations, leading zeros and numbered exams must match, not duplicate
+{
+  const T = (id, name) => ({ id, name, date: '2026-01-01' });
+  const st = { subjects: [], mocks: [], tests: [T('coa1', 'COA · Weekly Test 01'), T('db1', 'DBMS · Weekly Test 02'), T('s5', 'SWT 05 : Engineering Maths'), T('m1', 'MST 1 : C + DS + ToC + Algorithms')] };
+  const P = (id, name) => ({ id, name, start: '2026-08-02T10:00:00Z', marks: 15, mins: 30, q: 10 });
+  const r = applyPwSync(st, { kind: 'pw-sync', version: 3, updated: '2026-10-05T00:00:00Z', subjects: [], results: [], tests: [
+    P('a', 'Computer Organization and Architecture : Weekly Test 01'), P('b', 'Database Management System : Weekly Test 02'),
+    P('c', 'SWT 5 : Engineering Maths'), P('d', 'MST 1 : C Programming + Data Structures + Theory of Computation + Algorithms'),
+    P('e', 'Digital Logic : Weekly Test 01') ] });
+  assert.strictEqual(r.report.updatedTests, 4); assert.strictEqual(r.report.newTests, 1); assert.strictEqual(r.tests.length, 5);
+  assert.ok(r.tests.slice(0, 4).every((t) => t.pwId));
+}
 console.log('all pwsync tests passed');

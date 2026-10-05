@@ -151,6 +151,9 @@ export const PW_SUBJECT_MAP = {
 const normName = (t) => String(t || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
 const normChapter = (t) => normName(String(t || '').replace(/^\s*ch(?:apter)?\s*0*\d+\s*[·:.\-–]?\s*/i, ''));
 const normTest = (t) => String(t || '').toLowerCase().replace(/[:·]/g, ' ').replace(/\s+/g, ' ').trim();
+// looser keys so 'COA · Weekly Test 01' = 'Computer Organization and Architecture : Weekly Test 01', 'SWT 05' = 'SWT 5', and 'MST 3 : ...' matches by its number
+const testKey = (t) => normTest(String(t || '').replace(/[+&]/g, ' ')).replace(/\bcoa\b/g, 'computer organization and architecture').replace(/\bdbms\b/g, 'database management system').replace(/\b0+(\d)/g, '$1');
+const testNum = (t) => { const m = /^(swt|twt|mst|gbg)\s*(\d+)\b/.exec(testKey(t)); return m ? m[1] + ' ' + m[2] : null; };
 const dayOf = (iso) => (iso ? String(iso).slice(0, 10) : '');
 const subjectId = (name) => PW_SUBJECT_MAP[normName(name)] || null;
 
@@ -192,11 +195,14 @@ export function applyPwSync(state, snap) {
 
   // tests
   const tests = [...(state.tests || [])];
-  const idxByName = new Map(), idxById = new Map();
-  tests.forEach((t, i) => { idxByName.set(normTest(t.name), i); idxById.set(t.id, i); });
+  const idxByName = new Map(), idxById = new Map(), idxByKey = new Map(), idxByNum = new Map();
+  const reg = (t, i) => { idxByName.set(normTest(t.name), i); idxById.set(t.id, i); idxByKey.set(testKey(t.name), i); const n = testNum(t.name); if (n) idxByNum.set(n, i); };
+  tests.forEach(reg);
   const testFor = new Map();   // pw test id -> app test id
   for (const pt of snap.tests || []) {
     let i = idxByName.get(normTest(pt.name));
+    if (i == null) i = idxByKey.get(testKey(pt.name));
+    if (i == null) { const n = testNum(pt.name); if (n) i = idxByNum.get(n); }
     if (i == null) i = idxById.get(pt.id);
     const date = dayOf(pt.start);
     if (i != null) {
@@ -205,7 +211,7 @@ export function applyPwSync(state, snap) {
       testFor.set(pt.id, t.id); report.updatedTests++;
     } else {
       const t = { id: 'pw-' + pt.id, name: pt.name, date, marks: pt.marks, mins: pt.mins, q: pt.q, source: 'pw', pwId: pt.id };
-      tests.push(t); idxByName.set(normTest(t.name), tests.length - 1); idxById.set(t.id, tests.length - 1);
+      tests.push(t); reg(t, tests.length - 1);
       testFor.set(pt.id, t.id); report.newTests++;
     }
   }
