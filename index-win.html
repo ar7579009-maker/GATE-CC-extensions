@@ -165,6 +165,7 @@ th{color:var(--mute);font-weight:500;border-top:0}
 body[data-platform=win] nav:not(.sidenav),body[data-platform=win] .botnav{display:none!important}
 .sidenav button .ico{width:18px;height:18px;font-size:0}
 .ico svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;display:block}
+.more .more-sec{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}.more .more-sec>.card{border:0;background:none;padding:0;margin:0;box-shadow:none}.more>summary{list-style:none}
 </style>
 </head>
 <body>
@@ -193,17 +194,7 @@ body[data-platform=win] nav:not(.sidenav),body[data-platform=win] .botnav{displa
     <div class="content-inner" id="root"></div>
   </main>
 </div>
-<script>
-  // Mark platform so App.jsx can detect it
-  document.body.dataset.platform = 'win';
-  // Wire sidebar tab clicks → send to React
-  document.getElementById('sidenav').addEventListener('click', e => {
-    const btn = e.target.closest('[data-tab]');
-    if (!btn) return;
-    document.querySelectorAll('.sidenav [data-tab]').forEach(b => b.classList.toggle('on', b === btn));
-    window.__gccSetTab?.(btn.dataset.tab);
-  });
-</script>
+<script src="shell-win.js"></script>
 <script src="bundle.js"></script>
 </body>
 </html>

@@ -1,7 +1,10 @@
 // Layout: which cards the user hid (device-local, NOT in SYNCED). Hiding only changes the display.
 export const CARDS = {
   timer: 'Deep-work timer', calc: 'Planner calculator', deadline: 'Deadline',
-  rules: 'Daily rules', outlook: 'Outlook', schedule: 'Schedule',
+  schedule: 'Schedule', rules: 'Daily rules',
+  subjects: 'Syllabus', revq: 'Revision queue',
+  tests: 'Latest result', tlist: 'All tests',
+  sync: 'PW sync',
 };
 export const LOCKED = ['verdict', 'today'];
 export const isLocked = (id) => LOCKED.includes(id);

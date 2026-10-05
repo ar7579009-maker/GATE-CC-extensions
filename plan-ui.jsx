@@ -78,7 +78,7 @@ export function PaceCalc({ P, s, set, today }) {
         <Cell k={`covered in ${windowDays} days`} v={`${fh(r.windowHours)} h`} sub="after the lost-days buffer" />
         <Cell k="needed to hit target" v={r.neededPerDay == null ? '–' : `${fh(r.neededPerDay)} h/day`} sub={`by ${sdy(H.targetDate)}`} />
       </div>
-      <div className="dim small" style={{ marginTop: 8 }}>Speed only shortens lecture video with a known length; DPP, PYQs, notes and revision time stay as estimated.</div>
+      <div className="dim small" style={{ marginTop: 8 }}>Speed shortens lecture video only; DPP, PYQs, notes and revision stay as estimated.{H.videoEstimated ? ' Lecture lengths are estimated until the PW sync fills them in.' : ''}</div>
     </div>
   );
 }

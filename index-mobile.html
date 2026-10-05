@@ -275,6 +275,7 @@ td,th{padding:7px 6px;border-top:1px solid var(--line);text-align:left;font-size
 #root .shell{display:block;height:auto;padding-top:0}.wrap{max-width:none}
 .botnav button .ico{width:22px;height:22px;font-size:0}
 .ico svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;display:block}
+.more .more-sec{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}.more .more-sec>.card{border:0;background:none;padding:0;margin:0;box-shadow:none}.more>summary{list-style:none}
 </style>
 </head>
 <body>
@@ -310,20 +311,7 @@ td,th{padding:7px 6px;border-top:1px solid var(--line);text-align:left;font-size
   </nav>
   <div class="float-timer" id="float-timer"></div>
 </div>
-<script>
-  document.body.dataset.platform = 'mobile';
-  // Wire bottom nav clicks → React
-  document.getElementById('botnav').addEventListener('click', e => {
-    const btn = e.target.closest('[data-tab]');
-    if (!btn) return;
-    document.querySelectorAll('.botnav [data-tab]').forEach(b => {
-      const on = b === btn;
-      b.classList.toggle('on', on);
-      b.querySelector('.ico-bar').style.display = on ? 'block' : 'none';
-    });
-    window.__gccSetTab?.(btn.dataset.tab);
-  });
-</script>
+<script src="shell-mobile.js"></script>
 <script src="bundle.js"></script>
 </body>
 </html>

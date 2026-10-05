@@ -38,6 +38,8 @@
       "index.html",
       "index-win.html",
       "index-mobile.html",
+      "shell-win.js",
+      "shell-mobile.js",
       "bundle.js",
       "icon.png",
       "icon.ico",

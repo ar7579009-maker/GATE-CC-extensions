@@ -4,7 +4,7 @@ import { SUBJECTS, MARKS_MAP, TESTS } from './data.js';
 import { useSync, SyncCard } from './sync.jsx';
 import { saveResilient, loadResilient } from './sync-core.js';
 import { buildPlan, mastery, DEFAULT_PRIOR } from './planner.js';
-import { Verdict, PaceCalc, TodayList, PlanOutlook, PlannerSettings } from './plan-ui.jsx';
+import { Verdict, PaceCalc, TodayList, PlannerSettings } from './plan-ui.jsx';
 import { setupNative, saveFile } from './native.js';
 import { setupWeb } from './pwa.js';
 import { Num, Inline, InlineDate } from './ui.js';
@@ -484,6 +484,18 @@ function useNow(on) {
 const Bar = ({ v, c = '' }) => <div className={`bar ${c}`}><i style={{ width: `${Math.max(0, Math.min(100, (v || 0) * 100))}%` }} /></div>;
 
 /* ───────── app ───────── */
+function SettingsPane({ s, set, setS, sync }) {
+  return <>
+    <LayoutCard />
+    <Hideable id="sync"><ImportFromPW s={s} setS={setS} /></Hideable>
+    <details className="card more"><summary style={{ cursor: 'pointer', fontWeight: 600 }}>More</summary>
+      <div className="more-sec"><Settings s={s} set={set} /></div>
+      <div className="more-sec"><PlannerSettings s={s} set={set} /></div>
+      <div className="more-sec"><SyncCard sync={sync} /></div>
+      <div className="more-sec"><DataCard s={s} setS={setS} /></div>
+    </details>
+  </>;
+}
 function App() {
   const [s, setS] = useState(load);
   const platform = document.body.dataset.platform || 'web'; // 'win' | 'mobile' | 'web'
@@ -533,11 +545,11 @@ function App() {
       {tab !== 'today' && platform === 'web' && <MiniBar eng={eng} go={() => setTab('today')} />}
       {panel && <div className="sheet" onClick={() => setPanel(false)}><div className="sheetin" onClick={(e) => e.stopPropagation()}>
         <div className="row sb" style={{ marginBottom: 12 }}><h2 style={{ margin: 0 }}>Settings &amp; data</h2><button className="btn sm ghost" onClick={() => setPanel(false)}>Close</button></div>
-        <Settings s={s} set={set} /><LayoutCard /><PlannerSettings s={s} set={set} /><SyncCard sync={sync} /><ImportFromPW s={s} setS={setS} /><DataCard s={s} setS={setS} />
+        <SettingsPane s={s} set={set} setS={setS} sync={sync} />
       </div></div>}
       {/* settings tab for win/mobile shells (no gear button in their nav) */}
       {tab === 'settings' && platform !== 'web' && <div className="sheetin" style={{ padding: '0 0 20px' }}>
-        <Settings s={s} set={set} /><LayoutCard /><PlannerSettings s={s} set={set} /><SyncCard sync={sync} /><ImportFromPW s={s} setS={setS} /><DataCard s={s} setS={setS} />
+        <SettingsPane s={s} set={set} setS={setS} sync={sync} />
       </div>}
       {platform === 'web' && <nav>{tabs.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}<button className="gearbtn" title="Settings & data" onClick={() => setPanel(true)}><svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 20, height: 20, fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round', display: 'block', margin: '0 auto' }}><circle cx="12" cy="12" r="3" /><path d="M12 2.8v2.6M12 18.6v2.6M4.6 7.4l2.2 1.3M17.2 15.3l2.2 1.3M4.6 16.6l2.2-1.3M17.2 8.7l2.2-1.3" /></svg></button></nav>}
     </div>
@@ -617,7 +629,7 @@ function DailyRules({ s, set, D }) {
 }
 
 function PlanTab({ s, set, D }) {
-  return <><Hideable id="rules"><DailyRules s={s} set={set} D={D} /></Hideable><Hideable id="outlook"><PlanOutlook P={D.P} /></Hideable><Hideable id="schedule"><Plan s={s} set={set} /></Hideable></>;
+  return <><Hideable id="schedule"><Plan s={s} set={set} /></Hideable><Hideable id="rules"><DailyRules s={s} set={set} D={D} /></Hideable></>;
 }
 
 /* ───────── Import PW sync file (pw-sync-latest.json) ───────── */
@@ -695,6 +707,20 @@ function DataCard({ s, setS }) {
 }
 
 /* ───────── Syllabus: import, edit, categories ───────── */
+function RevQueue({ s, set }) {
+  const today = dkey();
+  const rows = s.revq.map((r) => { const i = r.done.indexOf(false); return i < 0 ? null : { r, i, due: addDays(r.base, REV_DAYS[i]) }; }).filter(Boolean).sort((a, b) => a.due.localeCompare(b.due));
+  const mark = (key, i) => set('revq', (a) => a.map((r) => (r.key === key ? { ...r, done: r.done.map((d, j) => (j === i ? true : d)) } : r)));
+  return <div className="card">
+    <h3>Revision queue</h3>
+    {rows.length ? rows.slice(0, 12).map(({ r, i, due }) => { const d = diff(due, today); return <div key={r.key} className="row sb small" style={{ padding: '5px 0', borderTop: '1px solid var(--line)', flexWrap: 'nowrap' }}>
+      <span style={{ minWidth: 0 }}>{r.sub} · {r.ch}<span className="dim"> · {d <= 0 ? (d < 0 ? `${-d} d late` : 'due today') : `due +${d} d`}</span></span>
+      {d <= 0 && <button className="btn sm ghost" onClick={() => mark(r.key, i)}>Done</button>}
+    </div>; }) : <div className="mute small">Nothing queued. A chapter joins the queue once all its lectures are ticked.</div>}
+    {rows.length > 12 && <div className="dim small" style={{ marginTop: 6 }}>+{rows.length - 12} more</div>}
+  </div>;
+}
+
 function Syllabus({ s, set }) {
   const [f, setF] = useState('all'), [edit, setEdit] = useState(false), [msg, setMsg] = useState('');
   const upd = (sid, fn) => set('subjects', (a) => a.map((x) => (x.id === sid ? fn(x) : x)));
@@ -719,18 +745,8 @@ function Syllabus({ s, set }) {
       <button className={`btn ${edit ? '' : 'ghost'}`} onClick={() => setEdit(!edit)}>{edit ? 'Done editing' : 'Edit'}</button>
     </div>
 
-    <div className="card">
-      <div className="row">
-        <label className="btn ghost">Import syllabus<input type="file" accept=".json,.csv,.html,.htm" hidden onChange={onFile} /></label>
-        <button className="btn ghost" onClick={() => download('syllabus.json', s.subjects)}>Export syllabus</button>
-      </div>
-      <div className="small mute" style={{ marginTop: 8 }}>Accepts your checklist .html, a .json (use Export as the template) or a .csv with columns subject, type, chapter, lecture, date, dpp. Subjects that already exist are updated in place; new ones are added.</div>
-      {msg && <div className="small" style={{ marginTop: 6, color: 'var(--amber)' }}>{msg}</div>}
-    </div>
 
-    <SubjectGantt s={s} set={set} />
-
-    <div className="card" style={{ padding: '4px 14px' }}>
+    <Hideable id="subjects"><div className="card" style={{ padding: '4px 14px' }}>
       {sortSubjects(list).map((sub, si, sarr) => {
         const all = sub.chapters.flatMap((c) => c.lectures), d = all.filter((l) => l.done).length;
         return (
@@ -797,7 +813,18 @@ function Syllabus({ s, set }) {
       })}
       {edit && <button className="btn ghost" style={{ margin: '10px 0' }} onClick={addSub}>+ Add subject</button>}
       {!list.length && <div className="mute small" style={{ padding: '10px 0' }}>No subjects in this category.</div>}
+      <details className="more" style={{ margin: '10px 0' }}><summary className="mute small" style={{ cursor: 'pointer' }}>More</summary>
+    <div className="more-sec">
+      <div className="row">
+        <label className="btn ghost">Import syllabus<input type="file" accept=".json,.csv,.html,.htm" hidden onChange={onFile} /></label>
+        <button className="btn ghost" onClick={() => download('syllabus.json', s.subjects)}>Export syllabus</button>
+      </div>
+      <div className="small mute" style={{ marginTop: 8 }}>Accepts your checklist .html, a .json (use Export as the template) or a .csv with columns subject, type, chapter, lecture, date, dpp. Subjects that already exist are updated in place; new ones are added.</div>
+      {msg && <div className="small" style={{ marginTop: 6, color: 'var(--amber)' }}>{msg}</div>}
     </div>
+      </details>
+    </div></Hideable>
+    <Hideable id="revq"><RevQueue s={s} set={set} /></Hideable>
   </>);
 }
 
@@ -841,13 +868,35 @@ function Mocks({ s, set }) {
   const twoPass = (x) => (['mock', 'gbg', 'pyq', 'mst'].includes(x.kind) && x.mins ? `Pass 1 to ${Math.round(x.mins * 0.67)}m · Pass 2 to ${Math.round(x.mins * 0.92)}m · review to ${x.mins}m` : '');
   const missed = pending.filter((t) => t.date && t.date < today).length;
 
+  const last = M[M.length - 1], acc = last && last.accuracy != null ? (last.accuracy <= 1 ? last.accuracy * 100 : last.accuracy) : null, lostTot = last ? CATS.reduce((a, [c]) => a + (last[c] || 0), 0) : 0;
   return (<>
-    {(upcoming.length > 0 || missed > 0) && <div className="card">
-      <div className="row sb"><h3 style={{ margin: 0 }}>Next tests</h3>{missed > 0 && <span className="small" style={{ color: 'var(--amber)' }}>{missed} missed / not logged</span>}</div>
-      {upcoming.map((x) => <div key={x.id} style={{ padding: '6px 0', borderTop: '1px solid var(--line)' }}><div className="row sb small"><span>{x.name}</span><span className="mute">{shortDate(x.date)}{x.time ? ' ' + x.time : ''} · {x.marks}m{x.mins ? ` · ${x.mins} min` : ''}</span></div>{twoPass(x) && <div className="dim small">{twoPass(x)}</div>}</div>)}
-    </div>}
+    <Hideable id="tests">{last ? <div className="card">
+      <div className="row sb"><h3 style={{ margin: 0 }}>{last.name}</h3><span className="num" style={{ color: norm(last) < 40 ? 'var(--red)' : undefined }}>{last.score}<span className="mute small">/{last.max}</span></span></div>
+      <div className="mute small" style={{ marginTop: 4 }}>{last.correct != null ? `${last.correct} correct · ${last.incorrect} wrong · ${last.skipped} skipped${acc != null ? ` · ${acc.toFixed(1)}% accuracy` : ''}` : last.date}</div>
+      <div className="small" style={{ marginTop: 8 }}>Marks lost to: {CATS.map(([c, l]) => <span key={c} className="tag" style={{ opacity: last[c] ? 1 : 0.5 }}>{l.split(' ')[0].toLowerCase()}{last[c] ? ` ${last[c]}` : ''}</span>)}</div>
+      <details style={{ marginTop: 8 }}><summary className="btn sm ghost" style={{ display: 'inline-block', cursor: 'pointer' }}>Tag errors</summary>
+        <div className="row" style={{ margin: '8px 0 0' }}>{CATS.map(([c, l]) => <label key={c} className="small mute">{l}<br /><Num min={0} max={last.max} value={last[c] || 0} onValue={(v) => updMock(last.id, { [c]: v })} /></label>)}</div>
+        {lostTot === 0 && last.max - last.score > 0 && <div className="small dim" style={{ marginTop: 4 }}>{(last.max - last.score).toFixed(1)} marks lost, none classified yet.</div>}
+      </details>
+    </div> : <div className="card"><h3>No result yet</h3><div className="mute small">Attempted tests from PW sync, or tests you log under More, show up here.</div></div>}</Hideable>
 
-    <div className="card">
+    <Hideable id="tlist">    <div className="card">
+  <div className="row sb"><h3 style={{ margin: 0 }}>All tests</h3><span className="mute small">{(() => { const c = countBy(tests, M, today); return `${c.attempted} attempted · ${c.missed} missed · ${c.upcoming} upcoming`; })()}</span></div>
+  <div className="row" style={{ margin: '8px 0 4px' }}>{[['all', 'All kinds'], ...KINDS].map(([k, l]) => <button key={k} className={`btn sm ${kf === k ? '' : 'ghost'}`} onClick={() => { setKf(k); setShowAll(false); }}>{l}</button>)}</div>
+  <div className="row" style={{ marginBottom: 8 }}>{[['all', 'Any status'], ...STATUSES].map(([k, l]) => <button key={k} className={`btn sm ${sf === k ? '' : 'ghost'}`} onClick={() => { setSf(k); setShowAll(false); }}>{l}</button>)}</div>
+  {(() => {
+    const rows = filterTests(tests, M, today, { kind: kf, status: sf }), shown = showAll ? rows : rows.slice(0, 40), col = { attempted: 'var(--green)', missed: 'var(--red)', upcoming: 'var(--mute)' };
+    return <>{shown.map(({ t, status, res }) => <div key={t.id} className="row sb small" style={{ padding: '5px 0', borderTop: '1px solid var(--line)', flexWrap: 'nowrap' }}>
+      <span style={{ minWidth: 0 }}>{t.name}<span className="dim"> · {shortDate(t.date)}{t.marks ? ` · ${t.marks}m` : ''}</span></span>
+      <span style={{ color: col[status], whiteSpace: 'nowrap' }}>{status === 'attempted' && res ? `${res.score}/${res.max}` : status}</span>
+    </div>)}
+    {!rows.length && <div className="mute small">No tests match.</div>}
+    {rows.length > shown.length && <button className="btn ghost sm" style={{ marginTop: 6 }} onClick={() => setShowAll(true)}>Show all {rows.length}</button>}</>;
+  })()}
+</div></Hideable>
+
+    <details className="card more"><summary style={{ cursor: 'pointer', fontWeight: 600 }}>More</summary>
+    <div className="more-sec">
       <h2>Log a test</h2>
       <div className="grid" style={{ gap: 8 }}>
         <select value={f.test} onChange={(e) => pick(e.target.value)}><option value="custom">Custom test</option>{tests.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
@@ -863,61 +912,13 @@ function Mocks({ s, set }) {
       <SubjectInputs f={f} setF={setF} />
       <button className="btn" onClick={add}>Save test</button>
     </div>
-
-    {M.length > 0 && <>
-      <div className="grid">
-        <div className="card"><div className="mute small">Average of last {last3.length} {full.length ? 'full mocks' : 'tests'} (/100)</div><div className="num" style={{ color: level.color }}>{avg.toFixed(1)}</div><div className="small">{level.label} <span className="mute">· {level.sub}</span></div></div>
-        <div className="card"><div className="mute small">Gap to {s.target} target</div><div className="num">{avg >= s.target ? 'On track' : `+${(s.target - avg).toFixed(1)}`}</div><div className="small mute">{M.length} tests logged</div></div>
-      </div>
-
-      <div className="card">
-        <h3>Where the marks leak</h3>
-        {CATS.map(([c, l]) => <div key={c} style={{ marginBottom: 8 }}><div className="row sb small"><span>{l}</span><span className="mute">{(lost[c] || 0).toFixed(1)} marks · {totalLost ? Math.round(((lost[c] || 0) / totalLost) * 100) : 0}%</span></div><Bar v={totalLost ? (lost[c] || 0) / totalLost : 0} c={c === 'silly' ? 'r' : c === 'time' ? 'b' : ''} /></div>)}
-        {unc > 0.5 && <div className="small dim">{unc.toFixed(1)} lost marks not yet classified. Tag them; "silly mistake" is only a reason if you say what you misread.</div>}
-        {worst[2] > 0 && <div className="small" style={{ marginTop: 8 }}><b>Biggest leak: {worst[1]}.</b> <span className="mute">{advice[worst[0]]}</span></div>}
-      </div>
-
-      <MockTrend s={s} />
-
-      <SubjectAnalysis s={s} />
-
-      <div className="card">
-        <h3>Cutoff map (normalised to /100)</h3>
-        {CUTOFFS.map((c) => <div key={c.label} className="row sb small" style={{ padding: '4px 0', opacity: avg >= c.min ? 1 : 0.55 }}>
-          <span style={{ color: c.color, fontWeight: 600 }}>{level.label === c.label ? '▸ ' : ''}{c.label} <span className="mute" style={{ fontWeight: 400 }}>{c.sub}</span></span><span className="mute">{c.min}+</span></div>)}
-        <div className="small dim" style={{ marginTop: 6 }}>Indicative bands from your tracker; real cutoffs move every year and by category.</div>
-      </div>
-
-      <div className="card">
-        <h3>Trajectory checkpoints (from your 120-day tracker)</h3>
-        {CHECKPOINTS.map((c) => { const due = c.by <= today, ok = c.min == null ? null : avg >= c.min;
-          return <div key={c.by} className="row sb small" style={{ padding: '4px 0' }}><span>{c.label}</span><span className="pill" style={{ color: ok == null ? 'var(--mute)' : ok ? 'var(--green)' : due ? 'var(--red)' : 'var(--amber)' }}>{shortDate(c.by)}{ok == null ? '' : ok ? ' · met' : due ? ' · missed' : ' · pending'}</span></div>; })}
-      </div>
-
-      <div className="card">
+      <div className="more-sec">
         <h3>History</h3>
         <table><thead><tr><th>Test</th><th>Score</th><th>/100</th><th /></tr></thead><tbody>
           {[...M].reverse().map((m) => <tr key={m.id}><td>{m.name}<div className="dim small">{m.date}{m.pwResultId ? ' · from PW' : ''}</div><details className="small"><summary className="mute">Tag lost marks{CATS.some(([c]) => m[c]) ? ` (${CATS.reduce((a, [c]) => a + (m[c] || 0), 0)})` : ''}</summary><div className="row" style={{ margin: '4px 0' }}>{CATS.map(([c, l]) => <label key={c} className="small mute">{l}<br /><Num min={0} max={m.max} value={m[c] || 0} onValue={(v) => updMock(m.id, { [c]: v })} /></label>)}</div></details></td><td>{m.score}/{m.max}</td><td>{norm(m).toFixed(0)}</td><td><button className="btn ghost" style={{ padding: '1px 8px' }} onClick={() => set('mocks', (a) => a.filter((x) => x.id !== m.id))}>×</button></td></tr>)}
         </tbody></table>
       </div>
-    </>}
-
-    <div className="card">
-      <div className="row sb"><h3 style={{ margin: 0 }}>All tests</h3><span className="mute small">{(() => { const c = countBy(tests, M, today); return `${c.attempted} attempted · ${c.missed} missed · ${c.upcoming} upcoming`; })()}</span></div>
-      <div className="row" style={{ margin: '8px 0 4px' }}>{[['all', 'All kinds'], ...KINDS].map(([k, l]) => <button key={k} className={`btn sm ${kf === k ? '' : 'ghost'}`} onClick={() => { setKf(k); setShowAll(false); }}>{l}</button>)}</div>
-      <div className="row" style={{ marginBottom: 8 }}>{[['all', 'Any status'], ...STATUSES].map(([k, l]) => <button key={k} className={`btn sm ${sf === k ? '' : 'ghost'}`} onClick={() => { setSf(k); setShowAll(false); }}>{l}</button>)}</div>
-      {(() => {
-        const rows = filterTests(tests, M, today, { kind: kf, status: sf }), shown = showAll ? rows : rows.slice(0, 40), col = { attempted: 'var(--green)', missed: 'var(--red)', upcoming: 'var(--mute)' };
-        return <>{shown.map(({ t, status, res }) => <div key={t.id} className="row sb small" style={{ padding: '5px 0', borderTop: '1px solid var(--line)', flexWrap: 'nowrap' }}>
-          <span style={{ minWidth: 0 }}>{t.name}<span className="dim"> · {shortDate(t.date)}{t.marks ? ` · ${t.marks}m` : ''}</span></span>
-          <span style={{ color: col[status], whiteSpace: 'nowrap' }}>{status === 'attempted' && res ? `${res.score}/${res.max}` : status}</span>
-        </div>)}
-        {!rows.length && <div className="mute small">No tests match.</div>}
-        {rows.length > shown.length && <button className="btn ghost sm" style={{ marginTop: 6 }} onClick={() => setShowAll(true)}>Show all {rows.length}</button>}</>;
-      })()}
-    </div>
-
-    <div className="card">
+    <div className="more-sec">
       <h3>Test series ({tests.length} tests · {logged.size} logged)</h3>
       <div className="row" style={{ marginBottom: 8 }}>
         <label className="btn ghost">Import test series<input type="file" accept=".json,.csv" hidden onChange={onTests} /></label>
@@ -937,6 +938,7 @@ function Mocks({ s, set }) {
         <button className="btn ghost" onClick={() => set('tests', (a) => [...a, { id: `t${Date.now()}`, name: 'New test', date: dkey(), marks: 100 }])}>+ Add test</button>
       </details>
     </div>
+    </details>
   </>);
 }
 

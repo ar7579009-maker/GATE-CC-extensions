@@ -61,12 +61,16 @@ export function buildPlan(inp) {
     return du >= 5 && h > 0 ? { h: clamp(h / du, 0.5, 5), measured: true } : { h: cfg.hPerLecture, measured: false };
   };
 
+  // lectures without a known length (not synced yet) are assumed to run as long as the average known one (default 1.5 h)
+  const knownDur = []; subjects.forEach((sub) => sub.chapters.forEach((c) => c.lectures.forEach((l) => { if (l.dur > 0) knownDur.push(l.dur); })));
+  const avgDur = knownDur.length ? knownDur.reduce((a, b) => a + b, 0) / knownDur.length : 5400;
+  let videoGuess = false;
   // ── per subject remaining work ──
   const subs = subjects.map((sub) => {
     let left = 0, total = 0, done = 0;
     sub.chapters.forEach((c) => c.lectures.forEach((l) => { total++; if (l.done) done++; else left += units(l); }));
     const pace = paceOf(keyOf(sub)), row = sub.row ? rowById.get(sub.row) : null;
-    let videoSec = 0; sub.chapters.forEach((c) => c.lectures.forEach((l) => { if (!l.done && l.dur > 0) videoSec += l.dur; }));
+    let videoSec = 0; sub.chapters.forEach((c) => c.lectures.forEach((l) => { if (l.done) return; if (l.dur > 0) videoSec += l.dur; else { videoSec += avgDur * units(l); videoGuess = true; } }));
     return { sub, row, left, total, done, pace, videoSec, skipped: false, hours: left * pace.h * (1 + cfg.revPct / 100) };
   });
   const active = subs.filter((x) => !x.skipped);
@@ -106,7 +110,7 @@ export function buildPlan(inp) {
   }
   const horizon = {
     targetDate: inp.targetDate, daysLeft: Math.max(0, diffDays(inp.targetDate, today)), workDays: wd, bufferPct: cfg.bufferPct, restDay: cfg.restDay, remainingLectures: remainingU,
-    remainingHours: hh(remainingH), videoHours: hh(active.reduce((a, x) => a + x.videoSec, 0) / 3600), needPerDay: Number.isFinite(need) ? hh(need) : null, actual7: hh(actual7), goalH, gap: Number.isFinite(need) ? hh(need - actual7) : null,
+    remainingHours: hh(remainingH), videoHours: hh(active.reduce((a, x) => a + x.videoSec, 0) / 3600), videoEstimated: videoGuess, needPerDay: Number.isFinite(need) ? hh(need) : null, actual7: hh(actual7), goalH, gap: Number.isFinite(need) ? hh(need - actual7) : null,
     status, missedLive: missedAll.length, options, pace: [...new Set(active.filter((x) => x.left > 0).map((x) => keyOf(x.sub)))].filter((k) => paceOf(k).measured).length,
   };
 

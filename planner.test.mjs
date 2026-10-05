@@ -46,7 +46,14 @@ P = buildPlan({ ...base, subjects, plan: { ...base.plan, skip: { cn: true } } })
 assert.strictEqual(P.horizon.remainingHours, before);
 // real lecture durations (PW sync) are reported as video hours; ticked lectures and lectures without a length are not counted
 subjects = [sub('os', 'os', 'rec', [{ name: 'Ch1', lectures: [{ name: 'a', date: '-', dur: 3600 }, { name: 'b', date: '-', dur: 7200, done: true }, { name: 'c', date: '-' }] }])];
-P = buildPlan({ ...base, subjects }); assert.strictEqual(P.horizon.videoHours, 1);
+P = buildPlan({ ...base, subjects });
+// unknown length falls back to the average known length (here (3600+7200)/2 = 1.5 h), flagged as estimated
+assert.strictEqual(P.horizon.videoHours, 2.5); assert.strictEqual(P.horizon.videoEstimated, true);
+subjects = [sub('os', 'os', 'rec', [{ name: 'Ch1', lectures: [{ name: 'a', date: '-', dur: 3600 }, { name: 'b', date: '-', dur: 7200, done: true }] }])];
+P = buildPlan({ ...base, subjects }); assert.strictEqual(P.horizon.videoHours, 1); assert.strictEqual(P.horizon.videoEstimated, false);
+// no durations anywhere: default 1.5 h per lecture so the speed control still changes the result
+subjects = [sub('os', 'os', 'rec', [{ name: 'Ch1', lectures: [{ name: 'a', date: '-' }, { name: 'b', date: '-' }] }])];
+P = buildPlan({ ...base, subjects }); assert.strictEqual(P.horizon.videoHours, 3);
 // placeholder chapter counts as `plc` lectures; ticking it removes that work
 subjects = [sub('ds', 'cn', 'live', [{ name: 'Trees', lectures: [{ name: 'Lectures done', date: '-', done: false }] }])];
 P = buildPlan({ ...base, subjects, plan: { ...base.plan, plc: 4 } }); assert.strictEqual(P.horizon.remainingLectures, 4);
